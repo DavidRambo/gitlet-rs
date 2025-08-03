@@ -5,3 +5,15 @@
 ** Related projects
    After doing it in Java, I implemented it [in Python](https://github.com/DavidRambo/gitlepy).
 
+* TODOs
+  - [ ] cli arg parser
+  - [ ] init new repository
+  - [ ] staging area (i.e. the Index)
+  - [ ] add
+  - [ ] status
+  - [ ] rm
+  - [ ] restore
+  - [ ] staged file with later changes
+  - [ ] commit
+  - [ ] merge
+
