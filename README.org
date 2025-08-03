@@ -1,0 +1,7 @@
+* gitlet-rs
+  A simple git-like version control CLI written in Rust and inspired by UC Berkeley's Gitlet project (an assignment in a course that uses Java).
+  I'm writing this for my own edification, as it is a nice project for TTD of a CLI app.
+
+** Related projects
+   After doing it in Java, I implemented it [in Python](https://github.com/DavidRambo/gitlepy).
+
