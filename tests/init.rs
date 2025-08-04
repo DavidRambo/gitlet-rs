@@ -27,6 +27,9 @@ fn init_new_repo_in_cd() -> Result<(), Box<dyn Error>> {
     tmpdir
         .child(".gitlet/index")
         .assert(predicate::path::is_dir());
+    tmpdir
+        .child(".gitlet/HEAD")
+        .assert(predicate::path::exists());
 
     Ok(())
 }
@@ -55,6 +58,9 @@ fn init_new_repo_in_path() -> Result<(), Box<dyn Error>> {
     tmpdir
         .child(".gitlet/index")
         .assert(predicate::path::is_dir());
+    tmpdir
+        .child(".gitlet/HEAD")
+        .assert(predicate::path::exists());
 
     Ok(())
 }
