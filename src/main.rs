@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use gitlet_rs::repo;
 
@@ -18,7 +19,7 @@ enum Commands {
     },
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
     let args = Cli::parse();
 
     match args.command {

@@ -5,7 +5,9 @@ edition = "2024"
 author = "David Rambo <davidrambo@mailfence.com>"
 
 [dependencies]
+anyhow = "1.0.98"
 clap = { version = "4.5.42", features = ["derive"] }
+sha1 = "0.10.6"
 
 [dev-dependencies]
 assert_cmd = "2.0.17"

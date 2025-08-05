@@ -1,13 +1,16 @@
 use std::fs;
 use std::path::Path;
 
+use anyhow::Result;
+use anyhow::anyhow;
+
 /// Represents a gitlet repository. This module provides methods for creating a new repository
 /// and for interacting with an existing one.
 // pub struct Repo {}
 
 /// Initializes a new gitlet repository. `repo_path` is an optional argument passed to
 /// `gitlet init` to specify the directory for the new repository. It defaults to the PWD.
-pub fn init(repo_dir: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn init(repo_dir: Option<String>) -> Result<()> {
     // If a repository directory was provided, then convert it to a Path,
     // otherwise, use the PWD.
     let repo_dir = match repo_dir {
@@ -17,7 +20,9 @@ pub fn init(repo_dir: Option<String>) -> Result<(), Box<dyn std::error::Error>> 
     let rpath = Path::new(&repo_dir);
 
     if rpath.join(".gitlet").exists() {
-        return Err("A gitlet repository already exists in this directory".into());
+        return Err(anyhow!(
+            "A gitlet repository already exists in this directory"
+        ));
     }
 
     if !rpath.exists() {
