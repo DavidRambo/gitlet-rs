@@ -38,7 +38,6 @@ fn init_new_repo_in_cd() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[ignore]
 fn init_new_repo_in_path() -> Result<(), Box<dyn Error>> {
     let mut cmd = Command::cargo_bin("gitlet")?;
     let tmpdir = assert_fs::TempDir::new()?;
@@ -69,7 +68,47 @@ fn init_new_repo_in_path() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[ignore]
+fn create_new_repo_dir_and_init() -> Result<(), Box<dyn Error>> {
+    let tmpdir = assert_fs::TempDir::new()?;
+    std::env::set_current_dir(tmpdir.path())?;
+
+    let mut cmd = Command::cargo_bin("gitlet")?;
+    cmd.arg("init").arg("new_tmp");
+
+    cmd.assert().success().stdout(predicate::str::contains(
+        "Initialized empty Gitlet repository",
+    ));
+
+    tmpdir
+        .child("new_tmp")
+        .child(".gitlet")
+        // .child("new_tmp/.gitlet") // This also works
+        .assert(predicate::path::is_dir());
+    tmpdir
+        .child("new_tmp")
+        .child(".gitlet/blobs")
+        .assert(predicate::path::is_dir());
+    tmpdir
+        .child("new_tmp")
+        .child(".gitlet/commits")
+        .assert(predicate::path::is_dir());
+    tmpdir
+        .child("new_tmp")
+        .child(".gitlet/refs")
+        .assert(predicate::path::is_dir());
+    tmpdir
+        .child("new_tmp")
+        .child(".gitlet/index")
+        .assert(predicate::path::is_dir());
+    tmpdir
+        .child("new_tmp")
+        .child(".gitlet/HEAD")
+        .assert(predicate::path::exists());
+
+    Ok(())
+}
+
+#[test]
 fn init_fails_repo_already_exists() -> Result<(), Box<dyn Error>> {
     let mut cmd = Command::cargo_bin("gitlet")?;
     let tmpdir = assert_fs::TempDir::new()?;
@@ -78,9 +117,9 @@ fn init_fails_repo_already_exists() -> Result<(), Box<dyn Error>> {
         .expect("Failed to create .gitlet directory in TempDir");
 
     cmd.arg("init").arg(tdpath);
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains("Gitlet repository already exists"));
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "A gitlet repository already exists in this directory",
+    ));
 
     Ok(())
 }
