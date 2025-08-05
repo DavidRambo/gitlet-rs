@@ -79,9 +79,7 @@ fn create_new_repo_dir_and_init() -> Result<(), Box<dyn Error>> {
     ));
 
     tmpdir
-        .child("new_tmp")
-        .child(".gitlet")
-        // .child("new_tmp/.gitlet") // This also works
+        .child("new_tmp/.gitlet")
         .assert(predicate::path::is_dir());
     tmpdir
         .child("new_tmp")
