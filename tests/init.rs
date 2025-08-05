@@ -1,7 +1,6 @@
 // Tests the init command.
 use assert_cmd::prelude::*; // Add methods on commands
 use assert_fs::prelude::*;
-use gitlet_rs::repo;
 // Add methods on commands
 use predicates::prelude::*; // For writing assertions
 use std::{error::Error, process::Command}; // Run programs
