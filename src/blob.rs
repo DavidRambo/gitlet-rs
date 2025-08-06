@@ -23,7 +23,8 @@ impl Blob {
     pub fn new(fpath: &path::Path) -> Result<Self> {
         let mut hasher = Sha1::new();
 
-        let f = std::fs::File::open(fpath)?;
+        let f = std::fs::File::open(fpath)
+            .with_context(|| format!("opening file for new blob to hash: '{:?}'", fpath))?;
         let buf = io::BufReader::new(&f);
 
         for bufline in buf.lines() {
@@ -34,7 +35,8 @@ impl Blob {
 
         let hash = hasher.finalize();
         let id = hex::encode(hash);
-        let bpath = path::PathBuf::from_str(&format!("{}/{}", &id[..2], &id[2..]))?;
+        let bpath = path::PathBuf::from_str(&format!("{}/{}", &id[..2], &id[2..]))
+            .with_context(|| "creathing blob's PathBuf from hex string")?;
 
         Ok(Self {
             id,
