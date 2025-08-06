@@ -58,9 +58,9 @@ mod tests {
     }
 
     #[test]
-    fn create_blob() {
+    fn create_blob_from_file() {
         let tmpfile = assert_fs::NamedTempFile::new("tmp.txt").unwrap();
-        tmpfile.write_str("Test text.\n").unwrap();
+        tmpfile.write_str("Test text.").unwrap();
         let blob = Blob::new(&tmpfile);
 
         assert!(!blob.is_err());
