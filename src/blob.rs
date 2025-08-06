@@ -9,16 +9,17 @@ use anyhow::{Context, Result};
 use sha1::{Digest, Sha1};
 
 /// Represents a blob, which is the gitlet object for a tracked file.
-/// NOTE: It may not be necessary to have all this information, as the hash it what is minimally
-/// required.
+/// 'id': 40-char String produced by the Sha1 hash
+/// 'blobpath': Path to the blob
 struct Blob {
-    id: String,              // 40-char string produced by the Sha1 hash
-    blobpath: path::PathBuf, // Path to the blob
-    filepath: path::PathBuf, // Path to the hashed file
-                             // File size?
+    id: String,
+    blobpath: path::PathBuf,
+    // File size?
 }
 
 impl Blob {
+    /// Constructs a new Blob from the provided file path. This provides the necessary metadata
+    /// with which gitlet may stage a file, commit it, and restore it.
     pub fn new(fpath: &path::Path) -> Result<Self> {
         let mut hasher = Sha1::new();
 
@@ -38,7 +39,6 @@ impl Blob {
         Ok(Self {
             id,
             blobpath: bpath,
-            filepath: fpath.to_path_buf(),
         })
     }
 }
@@ -68,6 +68,5 @@ mod tests {
 
         assert_eq!(blob.id, "79277d238f6bf9d31f1b9ff463ab5ba3bb23b105");
         assert_eq!(blob.blobpath, expected_bpath);
-        assert_eq!(blob.filepath, tmpfile.path());
     }
 }
