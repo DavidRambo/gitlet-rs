@@ -11,7 +11,7 @@ use sha1::{Digest, Sha1};
 /// Represents a blob, which is the gitlet object for a tracked file.
 /// 'id': 40-char String produced by the Sha1 hash
 /// 'blobpath': Path to the blob
-struct Blob {
+pub struct Blob {
     id: String,
     blobpath: path::PathBuf,
     // File size?
@@ -43,6 +43,22 @@ impl Blob {
             blobpath: bpath,
         })
     }
+
+    /// Constructs a Blob from an existent blob object's id.
+    pub fn retrieve(id: &str) -> Result<Self> {
+        todo!()
+    }
+
+    /// Writes the blob object file using Zlib compression on the file.
+    pub fn write_blob(&self, fpath: &path::Path) -> Result<()> {
+        todo!();
+    }
+
+    /// Reads the blob object file using Zlib decompression to retrieve the file.
+    // TODO: Should it return a file or buffer of the file?
+    pub fn read_blob(&self, fpath: &path::Path) -> Result<()> {
+        todo!();
+    }
 }
 
 #[cfg(test)]
@@ -70,5 +86,14 @@ mod tests {
 
         assert_eq!(blob.id, "79277d238f6bf9d31f1b9ff463ab5ba3bb23b105");
         assert_eq!(blob.blobpath, expected_bpath);
+    }
+
+    #[test]
+    #[ignore]
+    fn create_blob_from_blob_object() {
+        let tmpfile = assert_fs::NamedTempFile::new("tmp.txt").unwrap();
+        tmpfile.write_str("Test text.").unwrap();
+
+        // TODO: I'll come back to this test having implemented the compressed file in the blob object.
     }
 }
