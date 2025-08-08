@@ -16,6 +16,12 @@ struct Index {
     removals: HashSet<path::PathBuf>,
 }
 
+pub enum IndexAction {
+    Add,
+    Remove,
+    Unstage,
+}
+
 impl Index {
     /// Loads the staging area from .gitlet/index
     fn load() -> Result<Self> {
@@ -67,11 +73,6 @@ impl Index {
         self.save()
     }
 
-    fn unstage(&mut self, f: &path::Path) -> Result<()> {
-        self.additions.remove(f);
-        self.save()
-    }
-
     // FIX: Need first to check that the file is tracked. Note that this is a Git thing and not in
     // the Gitlet spec.
     fn remove(&mut self, f: &path::Path) -> Result<()> {
@@ -108,7 +109,7 @@ mod tests {
     #[test]
     fn load_empty_staging_area() -> Result<()> {
         let tmpdir = assert_fs::TempDir::new()?;
-        // std::env::set_current_dir(tmpdir.path())?;
+
         test_utils::set_dir(&tmpdir, || {
             std::fs::create_dir_all(".gitlet/blobs")?;
 
@@ -123,7 +124,6 @@ mod tests {
     #[test]
     fn clear_staging_area() -> Result<()> {
         let tmpdir = assert_fs::TempDir::new()?;
-        // std::env::set_current_dir(tmpdir.path())?;
 
         test_utils::set_dir(&tmpdir, || {
             std::fs::create_dir_all(".gitlet/blobs")?;
@@ -142,6 +142,46 @@ mod tests {
             let renew_index = Index::load()?;
             assert!(renew_index.additions.is_empty());
             assert!(renew_index.removals.is_empty());
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn stage_for_removal() -> Result<()> {
+        let tmpdir = assert_fs::TempDir::new()?;
+
+        test_utils::set_dir(&tmpdir, || {
+            std::fs::create_dir_all(".gitlet/blobs")?;
+
+            let tmp = assert_fs::NamedTempFile::new("tmp.txt")?;
+            tmp.write_str("Test text.")?;
+
+            assert!(action(IndexAction::Remove, tmp.to_str().unwrap()).is_ok());
+
+            let index = Index::load()?;
+            assert!(index.additions.is_empty());
+            assert!(index.removals.contains(&tmp.to_path_buf()));
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn stage_and_unstage() -> Result<()> {
+        let tmpdir = assert_fs::TempDir::new()?;
+
+        test_utils::set_dir(&tmpdir, || {
+            std::fs::create_dir_all(".gitlet/blobs")?;
+
+            let tmp = assert_fs::NamedTempFile::new("tmp.txt")?;
+            tmp.write_str("Test text.")?;
+
+            assert!(action(IndexAction::Add, tmp.to_str().unwrap()).is_ok());
+            assert!(action(IndexAction::Unstage, tmp.to_str().unwrap()).is_ok());
+
+            let index = Index::load()?;
+            assert!(index.additions.is_empty());
+
             Ok(())
         })
     }
