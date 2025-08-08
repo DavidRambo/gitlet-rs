@@ -72,7 +72,8 @@ impl Index {
         self.save()
     }
 
-    // FIX: Need first to check that the file is tracked. But it can't do that until
+    // FIX: Need first to check that the file is tracked. Note that this is a Git thing and not in
+    // the Gitlet spec.
     fn remove(&mut self, f: &path::Path) -> Result<()> {
         self.additions.remove(f);
         let res = self.removals.insert(f.to_path_buf());
