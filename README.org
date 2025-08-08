@@ -6,14 +6,17 @@
    After doing it in Java, I implemented it [in Python](https://github.com/DavidRambo/gitlepy).
 
 * TODOs
-  - [ ] cli arg parser
-  - [ ] init new repository
-  - [ ] staging area (i.e. the Index)
-  - [ ] add
+  - [X] cli arg parser
+  - [X] init new repository
+  - [X] blobs
+  - [X] compression for blobs
+  - [X] staging area (i.e. the Index)
+  - [X] add
   - [ ] status
   - [ ] rm
   - [ ] restore
   - [ ] staged file with later changes
   - [ ] commit
   - [ ] merge
+  - [ ] add headers to gitlet objects (as in git)
 

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use gitlet_rs::repo;
+use gitlet_rs::{index, repo};
 
 #[derive(Debug, Parser)]
 #[command(name = "gitlet")]
@@ -17,6 +17,9 @@ enum Commands {
         /// Optional path to specify. Default to PWD.
         repo_dir: Option<String>,
     },
+
+    /// Stage a file for commit
+    Add { filepath: String },
 }
 
 fn main() -> Result<()> {
@@ -24,6 +27,7 @@ fn main() -> Result<()> {
 
     match args.command {
         Commands::Init { repo_dir } => repo::init(repo_dir)?,
+        Commands::Add { filepath } => index::add(&filepath)?,
     }
 
     Ok(())
