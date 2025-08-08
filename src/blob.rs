@@ -8,11 +8,13 @@ use std::{
 use anyhow::{Context, Result};
 use flate2::write::ZlibEncoder;
 use flate2::{Compression, write::ZlibDecoder};
+use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 
 /// Represents a blob, which is the gitlet object for a tracked file.
 /// 'id': 40-char String produced by the Sha1 hash
 /// 'blobpath': Path to the blob
+#[derive(Deserialize, Serialize)]
 pub struct Blob {
     hash: String,
 }
