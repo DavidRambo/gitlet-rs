@@ -33,7 +33,6 @@ pub fn init(repo_dir: Option<String>) -> Result<()> {
     fs::create_dir(rpath.join(".gitlet/blobs"))?;
     fs::create_dir(rpath.join(".gitlet/commits"))?;
     fs::create_dir(rpath.join(".gitlet/refs"))?;
-    fs::create_dir(rpath.join(".gitlet/index"))?;
     fs::File::create(rpath.join(".gitlet/HEAD"))?;
 
     println!("Initialized empty Gitlet repository");
