@@ -83,13 +83,24 @@ impl Index {
     }
 }
 
-pub fn add(f: &str) -> Result<()> {
+/// Dispatches gitlet command, passed an IndexAction.
+pub fn action(act: IndexAction, filepath: &str) -> Result<()> {
     let mut index = Index::load()?;
 
-    let f = path::PathBuf::from(f);
+    let f = path::PathBuf::from(filepath);
     anyhow::ensure!(f.exists(), "Cannot stage file. File does not exist.");
 
-    index.stage(f).with_context(|| "Staging file")?;
+    match act {
+        IndexAction::Add => index.stage(f).with_context(|| "Staging file")?,
+        IndexAction::Remove => {
+            index.additions.remove(&f);
+            index.removals.insert(f);
+        }
+        IndexAction::Unstage => {
+            index.additions.remove(&f);
+            index.removals.remove(&f);
+        }
+    }
 
     index
         .save()
