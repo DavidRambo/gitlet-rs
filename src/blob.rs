@@ -12,9 +12,7 @@ use sha1::{Digest, Sha1};
 /// 'id': 40-char String produced by the Sha1 hash
 /// 'blobpath': Path to the blob
 pub struct Blob {
-    id: String,
-    blobpath: path::PathBuf,
-    // File size?
+    hash: String,
 }
 
 impl Blob {
@@ -34,14 +32,9 @@ impl Blob {
         }
 
         let hash = hasher.finalize();
-        let id = hex::encode(hash);
-        let bpath = path::PathBuf::from_str(&format!("{}/{}", &id[..2], &id[2..]))
-            .with_context(|| "creathing blob's PathBuf from hex string")?;
+        let hash = hex::encode(hash);
 
-        Ok(Self {
-            id,
-            blobpath: bpath,
-        })
+        Ok(Self { hash })
     }
 
     /// Constructs a Blob from an existent blob object's id.
@@ -79,13 +72,10 @@ mod tests {
         tmpfile.write_str("Test text.").unwrap();
         let blob = Blob::new(&tmpfile);
 
-        assert!(!blob.is_err());
+        assert!(blob.is_ok());
         let blob = blob.unwrap();
 
-        let expected_bpath = Path::new("79/277d238f6bf9d31f1b9ff463ab5ba3bb23b105");
-
-        assert_eq!(blob.id, "79277d238f6bf9d31f1b9ff463ab5ba3bb23b105");
-        assert_eq!(blob.blobpath, expected_bpath);
+        assert_eq!(blob.hash, "79277d238f6bf9d31f1b9ff463ab5ba3bb23b105");
     }
 
     #[test]
