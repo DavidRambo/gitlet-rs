@@ -100,6 +100,8 @@ mod tests {
     use assert_fs::prelude::*;
     use std::path::Path;
 
+    use crate::test_utils;
+
     #[test]
     fn no_file_to_blob() {
         let blob = Blob::new(Path::new("does/not/exist.txt"));
@@ -121,20 +123,23 @@ mod tests {
     #[test]
     fn write_blob_and_create_blob_from_object() -> Result<()> {
         let tmpdir = assert_fs::TempDir::new()?;
-        std::env::set_current_dir(tmpdir.path())?;
-        std::fs::create_dir_all(".gitlet/blobs")?;
 
-        let tmpfile = assert_fs::NamedTempFile::new("tmp.txt").unwrap();
-        tmpfile.write_str("Test text.").unwrap();
-        let blob = Blob::new(&tmpfile)?;
+        // std::env::set_current_dir(tmpdir.path())?;
+        test_utils::set_dir(&tmpdir, || {
+            std::fs::create_dir_all(".gitlet/blobs")?;
 
-        blob.write_blob(&tmpfile)?;
+            let tmpfile = assert_fs::NamedTempFile::new("tmp.txt").unwrap();
+            tmpfile.write_str("Test text.").unwrap();
+            let blob = Blob::new(&tmpfile)?;
 
-        let first_hash = blob.hash;
+            blob.write_blob(&tmpfile)?;
 
-        let blob = Blob::retrieve(&first_hash)?;
-        assert_eq!(first_hash, blob.hash);
+            let first_hash = blob.hash;
 
-        Ok(())
+            let blob = Blob::retrieve(&first_hash)?;
+            assert_eq!(first_hash, blob.hash);
+
+            Ok(())
+        })
     }
 }
