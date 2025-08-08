@@ -1,11 +1,13 @@
 // Handles the hashing of files.
 use std::{
-    io::{self, BufRead},
+    fs,
+    io::{self, BufReader, prelude::*},
     path,
-    str::FromStr,
 };
 
 use anyhow::{Context, Result};
+use flate2::write::ZlibEncoder;
+use flate2::{Compression, write::ZlibDecoder};
 use sha1::{Digest, Sha1};
 
 /// Represents a blob, which is the gitlet object for a tracked file.
@@ -38,19 +40,57 @@ impl Blob {
     }
 
     /// Constructs a Blob from an existent blob object's id.
-    pub fn retrieve(id: &str) -> Result<Self> {
-        todo!()
+    pub fn retrieve(hash: &str) -> Result<Self> {
+        let blobpath = path::Path::new(".gitlet/blobs")
+            .join(&hash[..2])
+            .join(&hash[2..]);
+
+        anyhow::ensure!(blobpath.exists(), "The provided blob object does not exist");
+
+        Ok(Blob {
+            hash: hash.to_string(),
+        })
     }
 
     /// Writes the blob object file using Zlib compression on the file.
     pub fn write_blob(&self, fpath: &path::Path) -> Result<()> {
-        todo!();
+        let blobpath = path::Path::new(".gitlet/blobs")
+            .join(&self.hash[..2])
+            .join(&self.hash[2..]);
+        fs::create_dir_all(blobpath.parent().unwrap())
+            .context("create .gitlet/blobs/##/ subdirectory")?;
+
+        let mut blobfile =
+            fs::File::create(blobpath).with_context(|| format!("creating blob file"))?;
+        let mut f = fs::File::open(fpath).context("opening file in working tree to compress")?;
+
+        let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
+        std::io::copy(&mut f, &mut e).with_context(|| "streaming file into encoder")?;
+        blobfile
+            .write_all(&e.finish().with_context(|| "finish compression")?)
+            .with_context(|| "write compressed file to blob object file")?;
+
+        Ok(())
     }
 
     /// Reads the blob object file using Zlib decompression to retrieve the file.
-    // TODO: Should it return a file or buffer of the file?
     pub fn read_blob(&self, fpath: &path::Path) -> Result<()> {
-        todo!();
+        let blobpath = path::Path::new(".gitlet/blobs")
+            .join(&self.hash[..2])
+            .join(&self.hash[2..]);
+
+        let mut blobfile =
+            fs::File::open(blobpath).with_context(|| "open blob object file for decompression")?;
+
+        let f = fs::File::create(fpath)
+            .with_context(|| "create file in working tree for streaming blob object")?;
+        let decoder = ZlibDecoder::new(f);
+        let mut decoder = BufReader::new(decoder);
+
+        std::io::copy(&mut decoder, &mut blobfile)
+            .with_context(|| "decompressing blob object into working tree file")?;
+
+        Ok(())
     }
 }
 
@@ -79,11 +119,22 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    fn create_blob_from_blob_object() {
+    fn write_blob_and_create_blob_from_object() -> Result<()> {
+        let tmpdir = assert_fs::TempDir::new()?;
+        std::env::set_current_dir(tmpdir.path())?;
+        std::fs::create_dir_all(".gitlet/blobs")?;
+
         let tmpfile = assert_fs::NamedTempFile::new("tmp.txt").unwrap();
         tmpfile.write_str("Test text.").unwrap();
+        let blob = Blob::new(&tmpfile)?;
 
-        // TODO: I'll come back to this test having implemented the compressed file in the blob object.
+        blob.write_blob(&tmpfile)?;
+
+        let first_hash = blob.hash;
+
+        let blob = Blob::retrieve(&first_hash)?;
+        assert_eq!(first_hash, blob.hash);
+
+        Ok(())
     }
 }
