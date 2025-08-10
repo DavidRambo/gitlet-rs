@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    io::{Read, Write},
+    io::Read,
     path,
     str::FromStr,
 };
@@ -83,6 +83,31 @@ impl Index {
         anyhow::ensure!(res, "Failed to stage file for removal");
         self.save()
     }
+}
+
+impl std::fmt::Display for Index {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut buf = String::new();
+        buf.push_str("=== Staged Files ===\n");
+        for filename in self.additions.keys() {
+            buf.push_str(filename.to_str().unwrap());
+            buf.push('\n');
+        }
+
+        buf.push_str("\n=== Removed Files ===\n");
+        for filename in self.removals.iter() {
+            buf.push_str(filename.to_str().unwrap());
+            buf.push('\n');
+        }
+
+        write!(f, "{}", buf)
+    }
+}
+
+pub fn status(mut writer: impl std::io::Write) -> Result<()> {
+    let index = Index::load()?;
+    write!(writer, "{index}").expect("Failed to write Index");
+    Ok(())
 }
 
 /// Dispatches gitlet command, passed as IndexAction.

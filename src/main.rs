@@ -29,6 +29,9 @@ enum Commands {
 
     /// Stage a file for removal upon commit
     Remove { filepath: String },
+
+    /// Display the status of the gitlet repository
+    Status,
 }
 
 fn main() -> Result<()> {
@@ -39,6 +42,7 @@ fn main() -> Result<()> {
         Commands::Add { filepath } => index::action(IndexAction::Add, &filepath)?,
         Commands::Unstage { filepath } => index::action(IndexAction::Unstage, &filepath)?,
         Commands::Remove { filepath } => index::action(IndexAction::Remove, &filepath)?,
+        Commands::Status => repo::status()?,
     }
 
     Ok(())

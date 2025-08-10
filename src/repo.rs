@@ -1,4 +1,6 @@
 use std::fs;
+use std::io;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -6,6 +8,8 @@ use std::str::FromStr;
 use anyhow::Context;
 use anyhow::Result;
 use anyhow::anyhow;
+
+use crate::index;
 
 /// Represents a gitlet repository. This module provides methods for creating a new repository
 /// and for interacting with an existing one.
@@ -42,6 +46,24 @@ pub fn init(repo_dir: Option<String>) -> Result<()> {
 
     Ok(())
 }
+
+/// Prints the status of the gitlet repository to stdout.
+pub fn status() -> Result<()> {
+    let stdout = io::stdout();
+    let handle = stdout.lock();
+    let mut buf_handle = io::BufWriter::new(handle);
+
+    // TODO: Current branch.
+
+    index::status(&mut buf_handle)?;
+
+    // TODO: Changes not staged for commit.
+
+    buf_handle.flush()?;
+
+    Ok(())
+}
+
 /// Returns the given filepath relative to the root directory of the working tree.
 ///
 /// For example, given a path `/var/tmp/work/sub/t.rs`, and assuming `/var/tmp/work/.gitlet`, the
