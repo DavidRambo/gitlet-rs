@@ -8,7 +8,7 @@ use std::{
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::blob::Blob;
+use crate::{blob::Blob, repo};
 
 #[derive(Default, Deserialize, Serialize)]
 struct Index {
@@ -63,12 +63,14 @@ impl Index {
         Ok(())
     }
 
-    fn stage(&mut self, f: path::PathBuf) -> Result<()> {
-        let blob = Blob::new(&f)
-            .with_context(|| "Creating blob for addition to index")
-            .unwrap();
+    fn stage(&mut self, filepath: path::PathBuf) -> Result<()> {
+        let blob = Blob::new(&filepath).with_context(|| "Creating blob for addition to index")?;
 
-        self.additions.insert(f, blob);
+        // Truncate filepath to working tree.
+        // let relpath = repo::find_working_tree_dir(&filepath)
+        //     .context("Convert filepath to be relative to working tree root")?;
+
+        self.additions.insert(filepath, blob);
 
         self.save()
     }
@@ -83,14 +85,17 @@ impl Index {
     }
 }
 
-/// Dispatches gitlet command, passed an IndexAction.
-pub fn action(act: IndexAction, filepath: &str) -> Result<()> {
+/// Dispatches gitlet command, passed as IndexAction.
+pub fn action(action: IndexAction, filepath: &str) -> Result<()> {
     let mut index = Index::load()?;
 
     let f = path::PathBuf::from(filepath);
     anyhow::ensure!(f.exists(), "Cannot stage file. File does not exist.");
 
-    match act {
+    let f = repo::find_working_tree_dir(&f)
+        .with_context(|| "Convert filepath to be relative to working tree root")?;
+
+    match action {
         IndexAction::Add => index.stage(f).with_context(|| "Staging file")?,
         IndexAction::Remove => {
             index.additions.remove(&f);
@@ -111,6 +116,8 @@ pub fn action(act: IndexAction, filepath: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
     use assert_fs::prelude::FileWriteStr;
 
     use crate::test_utils;
@@ -164,8 +171,9 @@ mod tests {
         test_utils::set_dir(&tmpdir, || {
             std::fs::create_dir_all(".gitlet/blobs")?;
 
-            let tmp = assert_fs::NamedTempFile::new("tmp.txt")?;
-            tmp.write_str("Test text.")?;
+            let mut f = std::fs::File::create("tmp.txt")?;
+            f.write_all(b"Test text.")?;
+            let tmp = path::PathBuf::from_str("tmp.txt")?;
 
             assert!(action(IndexAction::Remove, tmp.to_str().unwrap()).is_ok());
 
@@ -180,12 +188,14 @@ mod tests {
     #[test]
     fn stage_and_unstage() -> Result<()> {
         let tmpdir = assert_fs::TempDir::new()?;
+        dbg!(&tmpdir);
 
         test_utils::set_dir(&tmpdir, || {
             std::fs::create_dir_all(".gitlet/blobs")?;
 
-            let tmp = assert_fs::NamedTempFile::new("tmp.txt")?;
-            tmp.write_str("Test text.")?;
+            let mut f = std::fs::File::create("tmp.txt")?;
+            f.write_all(b"Test text.")?;
+            let tmp = path::PathBuf::from_str("tmp.txt")?;
 
             assert!(action(IndexAction::Add, tmp.to_str().unwrap()).is_ok());
             assert!(action(IndexAction::Unstage, tmp.to_str().unwrap()).is_ok());

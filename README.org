@@ -12,11 +12,14 @@
   - [X] compression for blobs
   - [X] staging area (i.e. the Index)
   - [X] add
-  - [ ] status
-  - [ ] rm
-  - [ ] restore
+  - [X] rm
+  - [X] restore
+  - [.] status
   - [ ] staged file with later changes
   - [ ] commit
+  - [ ] log
+  - [ ] branch
+  - [ ] switch [-c]
   - [ ] merge
   - [ ] add headers to gitlet objects (as in git)
 
