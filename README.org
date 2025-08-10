@@ -15,11 +15,16 @@
   - [X] rm
   - [X] restore
   - [X] status: additions and removals
-  - [ ] `stage` should write blob so that further modifications are separate
-  - [ ] status: staged file with later changes
+  - [X] `stage` should write blob so that further modifications are separate
   - [ ] commit
-  - [ ] remove blobs that have been unstaged and restaged if they are not part of a prior commit (this will likely require dedicating a separate subdir for staged blobs)
+  - [ ] commit: HEAD
+  - [ ] commit: impl Display for log command
   - [ ] log
+  - [ ] retrieve tracked files
+  - [ ] retrieve untracked files
+  - [ ] retrieve unstaged modified files
+  - [ ] status: staged file with later changes
+  - [ ] remove blobs that have been unstaged and restaged if they are not part of a prior commit (this will likely require dedicating a separate subdir for staged blobs)
   - [ ] branch
   - [X] status: current branch
   - [ ] switch [-c]
