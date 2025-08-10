@@ -1,4 +1,5 @@
-// Handles the hashing of files.
+//! Handles the hashing of files into blob objects, including reading and writing them to the
+//! .gitlet/blobs directory.
 use std::{
     fs,
     io::{self, BufReader, prelude::*},
