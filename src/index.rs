@@ -2,7 +2,6 @@ use std::{
     collections::{HashMap, HashSet},
     io::Read,
     path,
-    str::FromStr,
 };
 
 use anyhow::{Context, Result};
