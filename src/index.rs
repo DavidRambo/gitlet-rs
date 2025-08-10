@@ -68,10 +68,6 @@ impl Index {
     fn stage(&mut self, filepath: path::PathBuf, fpath_from_root: path::PathBuf) -> Result<()> {
         let blob = Blob::new(&filepath).with_context(|| "Creating blob for addition to index")?;
 
-        // Truncate filepath to working tree.
-        // let relpath = repo::find_working_tree_dir(&filepath)
-        //     .context("Convert filepath to be relative to working tree root")?;
-
         self.additions.insert(fpath_from_root, blob);
 
         self.save()
