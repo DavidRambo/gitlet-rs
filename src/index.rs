@@ -25,11 +25,11 @@ pub enum IndexAction {
 impl Index {
     /// Loads the staging area from .gitlet/index
     fn load() -> Result<Self> {
-        // Check for index file's existence. If not there, then create anew and return empty Index.
-        let index_file = path::PathBuf::from_str(".gitlet/index")
-            .with_context(|| "Create PathBuf for index file")
-            .unwrap();
+        let repo_root = repo::abs_path_to_repo_root()?;
 
+        let index_file = repo_root.join(".gitlet/index");
+
+        // Check for index file's existence. If not there, then create anew and return empty Index.
         if !index_file.exists() {
             let index = Self::default();
             index.save()?; // save() creates/truncates the index file
@@ -48,7 +48,9 @@ impl Index {
 
     /// Saves the staging area to .gitlet/index
     fn save(&self) -> Result<()> {
-        let f = std::fs::File::create(".gitlet/index")
+        let repo_root = repo::abs_path_to_repo_root()?;
+        let index_file = repo_root.join(".gitlet/index");
+        let f = std::fs::File::create(index_file)
             .with_context(|| "Create .gitlet/index file")
             .unwrap();
 
@@ -59,18 +61,18 @@ impl Index {
 
     /// Clears the index file and drops the Index
     fn clear(self) -> Result<()> {
-        let _res = std::fs::remove_file(".gitlet/index").context("Delete .gitlet/index")?;
+        std::fs::remove_file(".gitlet/index").context("Delete .gitlet/index")?;
         Ok(())
     }
 
-    fn stage(&mut self, filepath: path::PathBuf) -> Result<()> {
+    fn stage(&mut self, filepath: path::PathBuf, fpath_from_root: path::PathBuf) -> Result<()> {
         let blob = Blob::new(&filepath).with_context(|| "Creating blob for addition to index")?;
 
         // Truncate filepath to working tree.
         // let relpath = repo::find_working_tree_dir(&filepath)
         //     .context("Convert filepath to be relative to working tree root")?;
 
-        self.additions.insert(filepath, blob);
+        self.additions.insert(fpath_from_root, blob);
 
         self.save()
     }
@@ -117,18 +119,20 @@ pub fn action(action: IndexAction, filepath: &str) -> Result<()> {
     let f = path::PathBuf::from(filepath);
     anyhow::ensure!(f.exists(), "Cannot stage file. File does not exist.");
 
-    let f = repo::find_working_tree_dir(&f)
+    let fpath_from_root = repo::find_working_tree_dir(&f)
         .with_context(|| "Convert filepath to be relative to working tree root")?;
 
     match action {
-        IndexAction::Add => index.stage(f).with_context(|| "Staging file")?,
+        IndexAction::Add => index
+            .stage(f, fpath_from_root)
+            .with_context(|| "Staging file")?,
         IndexAction::Remove => {
-            index.additions.remove(&f);
-            index.removals.insert(f);
+            index.additions.remove(&fpath_from_root);
+            index.removals.insert(fpath_from_root);
         }
         IndexAction::Unstage => {
-            index.additions.remove(&f);
-            index.removals.remove(&f);
+            index.additions.remove(&fpath_from_root);
+            index.removals.remove(&fpath_from_root);
         }
     }
 

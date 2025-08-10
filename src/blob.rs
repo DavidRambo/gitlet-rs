@@ -62,8 +62,7 @@ impl Blob {
         fs::create_dir_all(blobpath.parent().unwrap())
             .context("create .gitlet/blobs/##/ subdirectory")?;
 
-        let mut blobfile =
-            fs::File::create(blobpath).with_context(|| format!("creating blob file"))?;
+        let mut blobfile = fs::File::create(blobpath).context("creating blob file")?;
         let mut f = fs::File::open(fpath).context("opening file in working tree to compress")?;
 
         let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
