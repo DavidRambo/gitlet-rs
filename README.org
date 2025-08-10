@@ -14,11 +14,13 @@
   - [X] add
   - [X] rm
   - [X] restore
-  - [.] status
-  - [ ] staged file with later changes
+  - [X] status: additions and removals
+  - [ ] `stage` should write blob so that further modifications are separate
+  - [ ] status: staged file with later changes
   - [ ] commit
   - [ ] log
   - [ ] branch
+  - [X] status: current branch
   - [ ] switch [-c]
   - [ ] merge
   - [ ] add headers to gitlet objects (as in git)
