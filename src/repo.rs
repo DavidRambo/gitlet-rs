@@ -3,7 +3,6 @@ use std::io;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use anyhow::Context;
 use anyhow::Result;
@@ -82,7 +81,19 @@ pub fn find_working_tree_dir(filepath: &std::path::Path) -> Result<PathBuf> {
     })?;
 
     // Find the root of the Gitlet repository.
-    let mut curr_dir = std::env::current_dir()?.join(&filepath.file_name().unwrap());
+    let curr_dir = abs_path_to_repo_root()?;
+
+    let relative_path = filepath
+        .strip_prefix(&curr_dir)
+        .context("Strip absolute path of prefix")?;
+
+    Ok(relative_path.to_path_buf())
+}
+
+/// Returns the absolute path to the root of the working tree in which the .gitlet/ directory resides.
+pub fn abs_path_to_repo_root() -> Result<PathBuf> {
+    let curr_dir = std::env::current_dir().context("Get current working directory")?;
+    let mut curr_dir = curr_dir.join("dummy_file_to_pop");
     let mut found = false;
 
     while curr_dir.pop() {
@@ -104,14 +115,7 @@ pub fn find_working_tree_dir(filepath: &std::path::Path) -> Result<PathBuf> {
 
     anyhow::ensure!(found, "Not a valid gitlet repository");
 
-    // At this point, curr_dir contains the absolute path to the gitlet repository's root working
-    // tree directory.
-
-    let relative_path = filepath
-        .strip_prefix(&curr_dir)
-        .context("Strip absolute path of prefix")?;
-
-    Ok(relative_path.to_path_buf())
+    Ok(curr_dir)
 }
 
 #[cfg(test)]
