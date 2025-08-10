@@ -25,9 +25,7 @@ pub enum IndexAction {
 impl Index {
     /// Loads the staging area from .gitlet/index
     fn load() -> Result<Self> {
-        let repo_root = repo::abs_path_to_repo_root()?;
-
-        let index_file = repo_root.join(".gitlet/index");
+        let index_file = repo::abs_path_to_repo_root()?.join(".gitlet/index");
 
         // Check for index file's existence. If not there, then create anew and return empty Index.
         if !index_file.exists() {
@@ -48,8 +46,7 @@ impl Index {
 
     /// Saves the staging area to .gitlet/index
     fn save(&self) -> Result<()> {
-        let repo_root = repo::abs_path_to_repo_root()?;
-        let index_file = repo_root.join(".gitlet/index");
+        let index_file = repo::abs_path_to_repo_root()?.join(".gitlet/index");
         let f = std::fs::File::create(index_file)
             .with_context(|| "Create .gitlet/index file")
             .unwrap();
@@ -61,12 +58,15 @@ impl Index {
 
     /// Clears the index file and drops the Index
     fn clear(self) -> Result<()> {
-        std::fs::remove_file(".gitlet/index").context("Delete .gitlet/index")?;
+        let index_file = repo::abs_path_to_repo_root()?.join(".gitlet/index");
+        std::fs::remove_file(index_file).context("Delete .gitlet/index")?;
         Ok(())
     }
 
+    /// Stages a file for addition in the next commit.
     fn stage(&mut self, filepath: path::PathBuf, fpath_from_root: path::PathBuf) -> Result<()> {
         let blob = Blob::new(&filepath).with_context(|| "Creating blob for addition to index")?;
+        blob.write_blob(&filepath)?;
 
         self.additions.insert(fpath_from_root, blob);
 

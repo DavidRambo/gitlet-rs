@@ -46,7 +46,8 @@ impl Blob {
 
     /// Constructs a Blob from an existent blob object's id.
     pub fn retrieve(hash: &str) -> Result<Self> {
-        let blobpath = path::Path::new(".gitlet/blobs")
+        let blobpath = repo::abs_path_to_repo_root()?
+            .join(".gitlet/blobs")
             .join(&hash[..2])
             .join(&hash[2..]);
 
@@ -59,8 +60,7 @@ impl Blob {
 
     /// Writes the blob object file using Zlib compression on the file.
     pub fn write_blob(&self, fpath: &path::Path) -> Result<()> {
-        let repo_root = repo::abs_path_to_repo_root()?;
-        let blobpath = repo_root
+        let blobpath = repo::abs_path_to_repo_root()?
             .join(".gitlet/blobs")
             .join(&self.hash[..2])
             .join(&self.hash[2..]);
@@ -81,8 +81,10 @@ impl Blob {
 
     /// Reads the blob object file using Zlib decompression to retrieve the file.
     pub fn read_blob(&self, fpath: &path::Path) -> Result<()> {
-        let repo_root = repo::abs_path_to_repo_root()?;
-        let blobpath = repo_root.join(&self.hash[..2]).join(&self.hash[2..]);
+        let blobpath = repo::abs_path_to_repo_root()?
+            .join(".gitlet/blobs")
+            .join(&self.hash[..2])
+            .join(&self.hash[2..]);
 
         let mut blobfile =
             fs::File::open(blobpath).with_context(|| "open blob object file for decompression")?;
