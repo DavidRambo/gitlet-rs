@@ -12,6 +12,8 @@ use flate2::{Compression, write::ZlibDecoder};
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 
+use crate::repo;
+
 /// Represents a blob, which is the gitlet object for a tracked file.
 /// 'id': 40-char String produced by the Sha1 hash
 /// 'blobpath': Path to the blob
@@ -57,7 +59,9 @@ impl Blob {
 
     /// Writes the blob object file using Zlib compression on the file.
     pub fn write_blob(&self, fpath: &path::Path) -> Result<()> {
-        let blobpath = path::Path::new(".gitlet/blobs")
+        let repo_root = repo::abs_path_to_repo_root()?;
+        let blobpath = repo_root
+            .join(".gitlet/blobs")
             .join(&self.hash[..2])
             .join(&self.hash[2..]);
         fs::create_dir_all(blobpath.parent().unwrap())
@@ -77,9 +81,8 @@ impl Blob {
 
     /// Reads the blob object file using Zlib decompression to retrieve the file.
     pub fn read_blob(&self, fpath: &path::Path) -> Result<()> {
-        let blobpath = path::Path::new(".gitlet/blobs")
-            .join(&self.hash[..2])
-            .join(&self.hash[2..]);
+        let repo_root = repo::abs_path_to_repo_root()?;
+        let blobpath = repo_root.join(&self.hash[..2]).join(&self.hash[2..]);
 
         let mut blobfile =
             fs::File::open(blobpath).with_context(|| "open blob object file for decompression")?;
