@@ -1,4 +1,5 @@
 pub mod blob;
+pub mod commit;
 pub mod index;
 pub mod repo;
-pub(crate) mod test_utils;
+pub mod test_utils;
