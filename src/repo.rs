@@ -1,6 +1,8 @@
 //! This module provides methods for creating a new repository and for interacting with an existing one.
+
 use std::fs;
 use std::io;
+use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
@@ -9,6 +11,7 @@ use anyhow::Context;
 use anyhow::Result;
 use anyhow::anyhow;
 
+use crate::commit::Commit;
 use crate::index;
 
 /// Initializes a new gitlet repository. `repo_path` is an optional argument passed to
@@ -114,6 +117,45 @@ pub(crate) fn abs_path_to_repo_root() -> Result<PathBuf> {
     anyhow::ensure!(found, "Not a valid gitlet repository");
 
     Ok(curr_dir)
+}
+
+/// Commits the staged changes to the repository.
+pub fn commit(message: String) -> Result<()> {
+    let index = index::Index::load().context("Load index for commit")?;
+    if index.is_clear() {
+        println!("Nothing to commit.");
+        return Ok(());
+    }
+
+    // Get the parent commit hash.
+    let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root")?;
+    let mut head = std::fs::File::open(repo_root.join(".gitlet/HEAD")).context("Open HEAD file")?;
+    let mut parent_hash = String::with_capacity(40);
+    let Ok(n) = head.read_to_string(&mut parent_hash) else {
+        anyhow::bail!("Problem with HEAD file");
+    };
+    // n == 0 => this is the first commit (HEAD is empty)
+    if n != 0 && n != 40 {
+        anyhow::bail!("Problem with HEAD file");
+    }
+
+    let new_commit = Commit::new(parent_hash, None, message, index).context("Create commit")?;
+    update_head(&new_commit.hash)?;
+    new_commit.save().context("Save new commit to repository")?;
+
+    index::clear_index().context("Clear the staging area")?;
+
+    Ok(())
+}
+
+/// Helper function to update HEAD file
+fn update_head(hash: &str) -> Result<()> {
+    let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root")?;
+    let mut head =
+        std::fs::File::create(repo_root.join(".gitlet/HEAD")).context("Open HEAD file")?;
+    head.write_all(hash.as_bytes())
+        .context("Write hash to HEAD")?;
+    Ok(())
 }
 
 /// Returns true if the given file is tracked.

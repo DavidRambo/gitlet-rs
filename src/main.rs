@@ -36,6 +36,9 @@ enum Commands {
 
     /// Display the status of the gitlet repository
     Status,
+
+    /// Commits the staged changes to the gitlet repository
+    Commit { message: String },
 }
 
 fn main() -> Result<()> {
@@ -47,6 +50,7 @@ fn main() -> Result<()> {
         Commands::Unstage { filepath } => index::action(IndexAction::Unstage, &filepath)?,
         Commands::Rm { cached, filepath } => index::rm(cached, &filepath)?,
         Commands::Status => repo::status()?,
+        Commands::Commit { message } => repo::commit(message)?,
     }
 
     Ok(())
