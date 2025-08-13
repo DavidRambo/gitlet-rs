@@ -27,8 +27,12 @@ enum Commands {
     /// Unstage a file that is staged for commit
     Unstage { filepath: String },
 
-    /// Stage a file for removal upon commit
-    Remove { filepath: String },
+    /// Stage a file for removal
+    Rm {
+        #[arg(long)]
+        cached: bool, // Only untrack the file, leave it in working tree.
+        filepath: String,
+    },
 
     /// Display the status of the gitlet repository
     Status,
@@ -41,7 +45,7 @@ fn main() -> Result<()> {
         Commands::Init { repo_dir } => repo::init(repo_dir)?,
         Commands::Add { filepath } => index::action(IndexAction::Add, &filepath)?,
         Commands::Unstage { filepath } => index::action(IndexAction::Unstage, &filepath)?,
-        Commands::Remove { filepath } => index::action(IndexAction::Remove, &filepath)?,
+        Commands::Rm { cached, filepath } => index::rm(cached, &filepath)?,
         Commands::Status => repo::status()?,
     }
 

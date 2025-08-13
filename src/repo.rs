@@ -1,3 +1,4 @@
+//! This module provides methods for creating a new repository and for interacting with an existing one.
 use std::fs;
 use std::io;
 use std::io::Write;
@@ -9,10 +10,6 @@ use anyhow::Result;
 use anyhow::anyhow;
 
 use crate::index;
-
-/// Represents a gitlet repository. This module provides methods for creating a new repository
-/// and for interacting with an existing one.
-// pub struct Repo {}
 
 /// Initializes a new gitlet repository. `repo_path` is an optional argument passed to
 /// `gitlet init` to specify the directory for the new repository. It defaults to the PWD.
@@ -57,6 +54,8 @@ pub fn status() -> Result<()> {
     index::status(&mut buf_handle)?;
 
     // TODO: Changes not staged for commit.
+    // Cross-reference existing files with HEAD's files.
+    // Cross-reference HEAD's files with working tree to check for deletions.
 
     buf_handle.flush()?;
 
@@ -72,8 +71,8 @@ pub fn status() -> Result<()> {
 ///
 /// This is useful for nested directory structures as well as for stripping arbitrary parent paths,
 /// such as with absolute paths.
-pub fn find_working_tree_dir(filepath: &std::path::Path) -> Result<PathBuf> {
-    let filepath = std::fs::canonicalize(&filepath).with_context(|| {
+pub(crate) fn find_working_tree_dir(filepath: &std::path::Path) -> Result<PathBuf> {
+    let filepath = std::fs::canonicalize(filepath).with_context(|| {
         format!(
             "Creating absolute path for filepath: '{}'",
             filepath.to_str().unwrap()
@@ -91,7 +90,7 @@ pub fn find_working_tree_dir(filepath: &std::path::Path) -> Result<PathBuf> {
 }
 
 /// Returns the absolute path to the root of the working tree in which the .gitlet/ directory resides.
-pub fn abs_path_to_repo_root() -> Result<PathBuf> {
+pub(crate) fn abs_path_to_repo_root() -> Result<PathBuf> {
     let curr_dir = std::env::current_dir().context("Get current working directory")?;
     let mut curr_dir = curr_dir.join("dummy_file_to_pop");
     let mut found = false;
@@ -100,12 +99,11 @@ pub fn abs_path_to_repo_root() -> Result<PathBuf> {
         for entry in curr_dir
             .read_dir()
             .expect("read_dir: entry in absolute path")
+            .flatten()
         {
-            if let Ok(entry) = entry {
-                if entry.file_name() == ".gitlet" {
-                    found = true;
-                    break;
-                }
+            if entry.file_name() == ".gitlet" {
+                found = true;
+                break;
             }
         }
         if found {
@@ -116,6 +114,35 @@ pub fn abs_path_to_repo_root() -> Result<PathBuf> {
     anyhow::ensure!(found, "Not a valid gitlet repository");
 
     Ok(curr_dir)
+}
+
+/// Returns true if the given file is tracked.
+///
+/// A file is tracked if it is represented either by the HEAD commit or by the index.
+pub(crate) fn is_tracked_by_head(filepath: &Path) -> bool {
+    let Ok(repo_root) = abs_path_to_repo_root() else {
+        return false;
+    };
+
+    let Ok(mut headfile) =
+        std::fs::File::open(repo_root.join(".gitlet/HEAD")).context("Open HEAD file")
+    else {
+        return false;
+    };
+
+    let mut buf = Vec::with_capacity(40);
+    let Ok(_) = headfile.read_exact(&mut buf) else {
+        return false;
+    };
+    let Ok(hash) = String::from_utf8(buf) else {
+        return false;
+    };
+
+    let Ok(head_commit) = Commit::load(&hash) else {
+        return false;
+    };
+
+    head_commit.tracks(filepath)
 }
 
 #[cfg(test)]

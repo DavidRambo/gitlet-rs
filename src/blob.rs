@@ -18,8 +18,8 @@ use crate::repo;
 /// 'id': 40-char String produced by the Sha1 hash
 /// 'blobpath': Path to the blob
 #[derive(Deserialize, Serialize)]
-pub struct Blob {
-    hash: String,
+pub(crate) struct Blob {
+    pub(crate) hash: String,
 }
 
 impl Blob {
@@ -29,7 +29,7 @@ impl Blob {
         let mut hasher = Sha1::new();
 
         let f = std::fs::File::open(fpath)
-            .with_context(|| format!("opening file for new blob to hash: '{:?}'", fpath))?;
+            .with_context(|| format!("opening file for new blob to hash: '{fpath:?}'"))?;
         let buf = io::BufReader::new(&f);
 
         for bufline in buf.lines() {
@@ -59,7 +59,7 @@ impl Blob {
     }
 
     /// Writes the blob object file using Zlib compression on the file.
-    pub fn write_blob(&self, fpath: &path::Path) -> Result<()> {
+    pub fn save(&self, fpath: &path::Path) -> Result<()> {
         let blobpath = repo::abs_path_to_repo_root()?
             .join(".gitlet/blobs")
             .join(&self.hash[..2])
@@ -67,35 +67,46 @@ impl Blob {
         fs::create_dir_all(blobpath.parent().unwrap())
             .context("create .gitlet/blobs/##/ subdirectory")?;
 
-        let mut blobfile = fs::File::create(blobpath).context("creating blob file")?;
-        let mut f = fs::File::open(fpath).context("opening file in working tree to compress")?;
+        let mut blobfile = fs::File::create(blobpath).context("Create blob file")?;
+        let mut f = fs::File::open(fpath).context("Open file in working tree to compress")?;
 
         let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
-        std::io::copy(&mut f, &mut e).with_context(|| "streaming file into encoder")?;
+        std::io::copy(&mut f, &mut e).context("Stream file into encoder")?;
         blobfile
-            .write_all(&e.finish().with_context(|| "finish compression")?)
-            .with_context(|| "write compressed file to blob object file")?;
+            .write_all(&e.finish().context("Finish compression")?)
+            .context("Write compressed file to blob object file")?;
 
         Ok(())
     }
 
+    /// Deletes the corresponding blob object file from the repository, consuming the Blob.
+    pub fn delete(self) -> Result<()> {
+        let blobpath = repo::abs_path_to_repo_root()?
+            .join(".gitlet/blobs")
+            .join(&self.hash[..2])
+            .join(&self.hash[2..]);
+
+        fs::remove_file(blobpath).context("Delete blob from repository")?;
+        Ok(())
+    }
+
     /// Reads the blob object file using Zlib decompression to retrieve the file.
-    pub fn read_blob(&self, fpath: &path::Path) -> Result<()> {
+    pub fn restore(&self, fpath: &path::Path) -> Result<()> {
         let blobpath = repo::abs_path_to_repo_root()?
             .join(".gitlet/blobs")
             .join(&self.hash[..2])
             .join(&self.hash[2..]);
 
         let mut blobfile =
-            fs::File::open(blobpath).with_context(|| "open blob object file for decompression")?;
+            fs::File::open(blobpath).context("Open blob object file for decompression")?;
 
         let f = fs::File::create(fpath)
-            .with_context(|| "create file in working tree for streaming blob object")?;
+            .context("Create file in working tree for streaming blob object")?;
         let decoder = ZlibDecoder::new(f);
         let mut decoder = BufReader::new(decoder);
 
         std::io::copy(&mut decoder, &mut blobfile)
-            .with_context(|| "decompressing blob object into working tree file")?;
+            .context("Decompress blob object into working tree file")?;
 
         Ok(())
     }
@@ -139,7 +150,7 @@ mod tests {
             tmpfile.write_str("Test text.").unwrap();
             let blob = Blob::new(&tmpfile)?;
 
-            blob.write_blob(&tmpfile)?;
+            blob.save(&tmpfile)?;
 
             let first_hash = blob.hash;
 

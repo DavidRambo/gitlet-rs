@@ -10,20 +10,19 @@ use serde::{Deserialize, Serialize};
 use crate::{blob::Blob, repo};
 
 #[derive(Default, Deserialize, Serialize)]
-struct Index {
-    additions: HashMap<path::PathBuf, Blob>,
-    removals: HashSet<path::PathBuf>,
+pub(crate) struct Index {
+    pub(crate) additions: HashMap<path::PathBuf, Blob>,
+    pub(crate) removals: HashSet<path::PathBuf>,
 }
 
 pub enum IndexAction {
     Add,
-    Remove,
     Unstage,
 }
 
 impl Index {
     /// Loads the staging area from .gitlet/index
-    fn load() -> Result<Self> {
+    pub(crate) fn load() -> Result<Self> {
         let index_file = repo::abs_path_to_repo_root()?.join(".gitlet/index");
 
         // Check for index file's existence. If not there, then create anew and return empty Index.
@@ -55,30 +54,28 @@ impl Index {
         Ok(())
     }
 
-    /// Clears the index file and drops the Index
-    fn clear(self) -> Result<()> {
+    // NOTE: I ended up clearing the index with an associated function. I'm leaving this method
+    // here in case it comes in handy or I decide to refactor the commit process.
+    /* /// Clears the index file and drops the Index
+    pub(crate) fn clear(self) -> Result<()> {
         let index_file = repo::abs_path_to_repo_root()?.join(".gitlet/index");
         std::fs::remove_file(index_file).context("Delete .gitlet/index")?;
         Ok(())
-    }
+    } */
 
     /// Stages a file for addition in the next commit.
     fn stage(&mut self, filepath: path::PathBuf, fpath_from_root: path::PathBuf) -> Result<()> {
         let blob = Blob::new(&filepath).with_context(|| "Creating blob for addition to index")?;
-        blob.write_blob(&filepath)?;
+        blob.save(&filepath)?;
 
         self.additions.insert(fpath_from_root, blob);
 
         self.save()
     }
 
-    // FIX: Need first to check that the file is tracked. Note that this is a Git thing and not in
-    // the Gitlet spec.
-    fn remove(&mut self, f: &path::Path) -> Result<()> {
-        self.additions.remove(f);
-        let res = self.removals.insert(f.to_path_buf());
-        anyhow::ensure!(res, "Failed to stage file for removal");
-        self.save()
+    /// Returns true if the staging area is clear.
+    pub(crate) fn is_clear(&self) -> bool {
+        self.additions.is_empty() && self.removals.is_empty()
     }
 }
 
@@ -97,8 +94,16 @@ impl std::fmt::Display for Index {
             buf.push('\n');
         }
 
-        write!(f, "{}", buf)
+        write!(f, "{buf}")
     }
+}
+/// Clears the index file without needing the Index
+pub(crate) fn clear_index() -> Result<()> {
+    let index_file = repo::abs_path_to_repo_root()?.join(".gitlet/index");
+    if index_file.exists() {
+        std::fs::remove_file(index_file).context("Delete .gitlet/index")?;
+    }
+    Ok(())
 }
 
 pub fn status(mut writer: impl std::io::Write) -> Result<()> {
@@ -107,7 +112,7 @@ pub fn status(mut writer: impl std::io::Write) -> Result<()> {
     Ok(())
 }
 
-/// Dispatches gitlet command, passed as IndexAction.
+/// Dispatches gitlet command either to stage or unstage a file.
 pub fn action(action: IndexAction, filepath: &str) -> Result<()> {
     let mut index = Index::load()?;
 
@@ -121,10 +126,6 @@ pub fn action(action: IndexAction, filepath: &str) -> Result<()> {
         IndexAction::Add => index
             .stage(f, fpath_from_root)
             .with_context(|| "Staging file")?,
-        IndexAction::Remove => {
-            index.additions.remove(&fpath_from_root);
-            index.removals.insert(fpath_from_root);
-        }
         IndexAction::Unstage => {
             index.additions.remove(&fpath_from_root);
             index.removals.remove(&fpath_from_root);
@@ -134,6 +135,49 @@ pub fn action(action: IndexAction, filepath: &str) -> Result<()> {
     index
         .save()
         .with_context(|| "Saving the staging area to the index file")?;
+
+    Ok(())
+}
+
+/// Removes file from the working tree and stages it for removal, or, if 'cached' is true, then
+/// only untracks the file.
+pub fn rm(cached: bool, filepath: &str) -> Result<()> {
+    let mut index = Index::load()?;
+
+    let f = path::PathBuf::from(filepath);
+    anyhow::ensure!(f.exists(), "Cannot remove file. File does not exist.");
+
+    let fpath_from_root = repo::find_working_tree_dir(&f)?;
+
+    // Check whether file is tracked.
+    if index.removals.contains(&fpath_from_root)
+        || (!index.additions.contains_key(&fpath_from_root)
+            && !repo::is_tracked_by_head(&fpath_from_root))
+    {
+        println!("The file is not tracked.");
+        return Ok(());
+    }
+
+    let res = index.removals.insert(fpath_from_root.clone());
+    anyhow::ensure!(res, "File already staged for removal");
+
+    if cached {
+        // Remove from index.
+        if index.additions.remove(&fpath_from_root).is_some() {
+            // Remove the staged blob. If it is restored, then the working tree will be the source.
+            let blob = Blob::new(&fpath_from_root)?;
+            blob.delete()?;
+        }
+        index.save().context("Save staging area to index")?;
+    } else {
+        if index.additions.remove(&fpath_from_root).is_some() {
+            // Remove the staged blob. If it is restored, then the HEAD copy will be the source.
+            let blob = Blob::new(&fpath_from_root)?;
+            blob.delete()?;
+        }
+        // Remove from the working tree.
+        std::fs::remove_file(&fpath_from_root).context("Delete file from working tree")?;
+    }
 
     Ok(())
 }
@@ -179,7 +223,7 @@ mod tests {
                 .additions
                 .insert(tmp.to_path_buf(), Blob::new(&tmp)?);
 
-            new_index.clear()?;
+            let _ = clear_index();
 
             let renew_index = Index::load()?;
             assert!(renew_index.additions.is_empty());
@@ -189,43 +233,44 @@ mod tests {
     }
 
     #[test]
-    fn stage_for_removal() -> Result<()> {
-        let tmpdir = assert_fs::TempDir::new()?;
-
-        test_utils::set_dir(&tmpdir, || {
-            std::fs::create_dir_all(".gitlet/blobs")?;
-
-            let mut f = std::fs::File::create("tmp.txt")?;
-            f.write_all(b"Test text.")?;
-            let tmp = path::PathBuf::from_str("tmp.txt")?;
-
-            assert!(action(IndexAction::Remove, tmp.to_str().unwrap()).is_ok());
-
-            let index = Index::load()?;
-            assert!(index.additions.is_empty());
-            assert!(index.removals.contains(&tmp.to_path_buf()));
-
-            Ok(())
-        })
-    }
-
-    #[test]
     fn stage_and_unstage() -> Result<()> {
         let tmpdir = assert_fs::TempDir::new()?;
-        dbg!(&tmpdir);
 
         test_utils::set_dir(&tmpdir, || {
             std::fs::create_dir_all(".gitlet/blobs")?;
 
             let mut f = std::fs::File::create("tmp.txt")?;
             f.write_all(b"Test text.")?;
-            let tmp = path::PathBuf::from_str("tmp.txt")?;
+            let tmp = path::PathBuf::from("tmp.txt");
 
             assert!(action(IndexAction::Add, tmp.to_str().unwrap()).is_ok());
             assert!(action(IndexAction::Unstage, tmp.to_str().unwrap()).is_ok());
 
             let index = Index::load()?;
             assert!(index.additions.is_empty());
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn stage_cached_for_removal() -> Result<()> {
+        let tmpdir = assert_fs::TempDir::new()?;
+
+        test_utils::set_dir(&tmpdir, || {
+            std::fs::create_dir_all(".gitlet/blobs")?;
+
+            let mut f = std::fs::File::create("tmp.txt")?;
+            f.write_all(b"Test text.")?;
+            let tmp = path::PathBuf::from("tmp.txt");
+
+            assert!(action(IndexAction::Add, tmp.to_str().unwrap()).is_ok());
+
+            assert!(rm(true, tmp.to_str().unwrap()).is_ok());
+
+            let index = Index::load()?;
+            assert!(index.additions.is_empty());
+            assert!(index.removals.contains(&tmp.to_path_buf()));
 
             Ok(())
         })
