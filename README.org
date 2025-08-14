@@ -16,10 +16,10 @@
   - [X] restore
   - [X] status: additions and removals
   - [X] `stage` should write blob so that further modifications are separate
-  - [ ] commit
+  - [X] commit
   - [X] commit: HEAD
-  - [ ] commit: handle removed files
-  - [ ] commit: impl Display for log command
+  - [X] commit: handle removed files
+  - [X] commit: impl Display for log command
   - [ ] log
   - [ ] retrieve tracked files
   - [ ] retrieve untracked files

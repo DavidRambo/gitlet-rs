@@ -3,12 +3,14 @@
 //! commit (or two, in the case of a merge commit), a message, a timestamp, and an id created by
 //! taking the sha1 hash of the message, timestamp, and parent commit(s).
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use std::{fs, time};
 
 use anyhow::{Context, Result};
+use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 
@@ -18,8 +20,8 @@ use crate::{index, repo};
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct Commit {
     pub(crate) hash: String,
-    parent: String,
-    merge_parent: String, // Empty string, "", when not a merge.
+    pub(crate) parent: String,
+    pub(crate) merge_parent: String, // Empty string, "", when not a merge.
     message: String,
     timestamp: u64,
     blobs: HashMap<PathBuf, Blob>,
@@ -135,11 +137,86 @@ impl Commit {
     }
 }
 
-// TODO: impl Display for log command
+/// Formats the commit's information for the log command.
+///
+/// ===
+/// commit [sha1 hash]
+/// Date: [timestamp]
+/// [commit message]
+/// [newline]
+impl Display for Commit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut buf = String::new();
+        buf.push_str("===\n");
+
+        buf.push_str("commit ");
+        buf.push_str(&self.hash);
+
+        buf.push_str("\nDate: ");
+        let date = DateTime::from_timestamp(self.timestamp as i64, 0).unwrap();
+        buf.push_str(&date.to_rfc2822());
+
+        buf.push_str("\n");
+        buf.push_str(&self.message);
+        buf.push_str("\n\n");
+
+        write!(f, "{buf}")
+    }
+}
 
 /// Returns a commit's HashMap of <filename, blob> entries.
 pub(crate) fn get_commit_blobs(commit_id: &str) -> Result<HashMap<PathBuf, Blob>> {
     let commit = Commit::load(commit_id)
         .with_context(|| format!("Load blobs from commit with hash {commit_id}"))?;
     Ok(commit.blobs)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use crate::test_utils;
+
+    use super::*;
+
+    #[test]
+    fn display_commit() -> Result<()> {
+        let tmpdir = assert_fs::TempDir::new()?;
+        test_utils::set_dir(&tmpdir, || {
+            std::fs::create_dir_all(".gitlet/commits/9f").context("Create .gitlet/commits/9f")?;
+            let mut f =
+                std::fs::File::create(".gitlet/commits/9f/58103e11b63e5ccca06154ab8838be7639a574")
+                    .context("Create commit file")?;
+
+            let json = serde_json::json!({
+                "hash":"9f58103e11b63e5ccca06154ab8838be7639a574",
+                "parent":"",
+                "merge_parent":"",
+                "message":"first commit",
+                "timestamp":1755104961,
+                "blobs":{"b.txt":{"hash":"02d92c580d4ede6c80a878bdd9f3142d8f757be8"}}
+            });
+            serde_json::to_writer(&mut f, &json).context("Write commit json")?;
+
+            let mut f = std::fs::File::create(".gitlet/HEAD").context("Create HEAD file")?;
+            f.write_all(b"9f58103e11b63e5ccca06154ab8838be7639a574")?;
+
+            let commit = Commit::load("9f58103e11b63e5ccca06154ab8838be7639a574")
+                .context("Load commit to test Display trait")?;
+
+            let mut res = vec![];
+            write!(&mut res, "{}", commit)?;
+
+            let expected = b"\
+                ===\n\
+                commit 9f58103e11b63e5ccca06154ab8838be7639a574\n\
+                Date: Wed, 13 Aug 2025 17:09:21 +0000\n\
+                first commit\n\n\
+                ";
+
+            assert_eq!(res, expected);
+
+            Ok(())
+        })
+    }
 }
