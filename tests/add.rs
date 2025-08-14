@@ -1,4 +1,4 @@
-// Tests the add command.
+//! Tests the add command.
 
 use std::error::Error;
 use std::process::Command;
@@ -9,7 +9,7 @@ use predicates::prelude::predicate;
 #[test]
 fn stage_file() -> Result<(), Box<dyn Error>> {
     let tmpdir = assert_fs::TempDir::new()?;
-    let tmp_path = String::from(&format!("{}/tmp.txt", tmpdir.to_str().unwrap()));
+    let tmp_path = format!("{}/tmp.txt", tmpdir.to_str().unwrap());
 
     let mut cmd = Command::new("touch");
     cmd.arg(&tmp_path);
@@ -23,7 +23,7 @@ fn stage_file() -> Result<(), Box<dyn Error>> {
     cmd.current_dir(&tmpdir).arg("add").arg(&tmp_path);
     cmd.assert().success();
 
-    assert!(std::path::Path::new(&format!("{}/.gitlet/index", &tmpdir.to_str().unwrap())).exists());
+    assert!(std::path::Path::new(&format!("{}/.gitlet/index", tmpdir.to_str().unwrap())).exists());
 
     Ok(())
 }

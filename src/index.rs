@@ -68,6 +68,7 @@ impl Index {
         let blob = Blob::new(&filepath).with_context(|| "Creating blob for addition to index")?;
         blob.save(&filepath)?;
 
+        self.removals.remove(&fpath_from_root);
         self.additions.insert(fpath_from_root, blob);
 
         self.save()
@@ -123,9 +124,7 @@ pub fn action(action: IndexAction, filepath: &str) -> Result<()> {
         .with_context(|| "Convert filepath to be relative to working tree root")?;
 
     match action {
-        IndexAction::Add => index
-            .stage(f, fpath_from_root)
-            .with_context(|| "Staging file")?,
+        IndexAction::Add => index.stage(f, fpath_from_root).context("Stage file")?,
         IndexAction::Unstage => {
             index.additions.remove(&fpath_from_root);
             index.removals.remove(&fpath_from_root);
@@ -145,38 +144,47 @@ pub fn rm(cached: bool, filepath: &str) -> Result<()> {
     let mut index = Index::load()?;
 
     let f = path::PathBuf::from(filepath);
+    // If the file has been deleted from the working tree by a previous `gitlet rm`, then this will
+    // trigger.
     anyhow::ensure!(f.exists(), "Cannot remove file. File does not exist.");
 
     let fpath_from_root = repo::find_working_tree_dir(&f)?;
 
-    // Check whether file is tracked.
-    if index.removals.contains(&fpath_from_root)
-        || (!index.additions.contains_key(&fpath_from_root)
-            && !repo::is_tracked_by_head(&fpath_from_root))
-    {
-        println!("The file is not tracked.");
-        return Ok(());
+    if index.removals.contains(&fpath_from_root) {
+        anyhow::bail!("File already staged for removal");
     }
 
-    let res = index.removals.insert(fpath_from_root.clone());
-    anyhow::ensure!(res, "File already staged for removal");
+    // Check whether file is tracked.
+    if !index.additions.contains_key(&fpath_from_root)
+        && !repo::is_tracked_by_head(&fpath_from_root)
+    {
+        println!("Cannot remove file. The file is not tracked.");
+        return Ok(());
+    }
 
     if cached {
         // Remove from index.
         if index.additions.remove(&fpath_from_root).is_some() {
-            // Remove the staged blob. If it is restored, then the working tree will be the source.
+            // Remove the staged blob. If it is added again, then the working tree will be the source.
+            // Note: git keeps the blob (perhaps it prunes things periodically?)
             let blob = Blob::new(&fpath_from_root)?;
             blob.delete()?;
         }
+
+        // Only need to stage for removal if it is tracked by the current commit.
+        if repo::is_tracked_by_head(&fpath_from_root) {
+            index.removals.insert(fpath_from_root);
+        }
+
         index.save().context("Save staging area to index")?;
     } else {
-        if index.additions.remove(&fpath_from_root).is_some() {
-            // Remove the staged blob. If it is restored, then the HEAD copy will be the source.
-            let blob = Blob::new(&fpath_from_root)?;
-            blob.delete()?;
+        // Per git, cannot rm a file that has changes staged for commit.
+        if index.additions.contains_key(&fpath_from_root) {
+            anyhow::bail!("Cannot remove a file with staged changes. Use --cached to unstage.");
         }
+
         // Remove from the working tree.
-        std::fs::remove_file(&fpath_from_root).context("Delete file from working tree")?;
+        std::fs::remove_file(filepath).context("Delete file from working tree")?;
     }
 
     Ok(())
@@ -254,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    fn stage_cached_for_removal() -> Result<()> {
+    fn test_rm_staged() -> Result<()> {
         let tmpdir = assert_fs::TempDir::new()?;
 
         test_utils::set_dir(&tmpdir, || {
@@ -270,7 +278,8 @@ mod tests {
 
             let index = Index::load()?;
             assert!(index.additions.is_empty());
-            assert!(index.removals.contains(&tmp.to_path_buf()));
+            assert!(!index.removals.contains(&tmp.to_path_buf()));
+            assert!(std::fs::exists("tmp.txt")?);
 
             Ok(())
         })

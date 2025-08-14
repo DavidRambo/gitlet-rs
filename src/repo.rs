@@ -98,7 +98,7 @@ pub(crate) fn abs_path_to_repo_root() -> Result<PathBuf> {
     let mut curr_dir = curr_dir.join("dummy_file_to_pop");
     let mut found = false;
 
-    while curr_dir.pop() {
+    while !found && curr_dir.pop() {
         for entry in curr_dir
             .read_dir()
             .expect("read_dir: entry in absolute path")
@@ -108,9 +108,6 @@ pub(crate) fn abs_path_to_repo_root() -> Result<PathBuf> {
                 found = true;
                 break;
             }
-        }
-        if found {
-            break;
         }
     }
 
@@ -166,21 +163,16 @@ pub(crate) fn is_tracked_by_head(filepath: &Path) -> bool {
         return false;
     };
 
-    let Ok(mut headfile) =
-        std::fs::File::open(repo_root.join(".gitlet/HEAD")).context("Open HEAD file")
-    else {
+    let Ok(buf) = std::fs::read(repo_root.join(".gitlet/HEAD")) else {
         return false;
     };
 
-    let mut buf = Vec::with_capacity(40);
-    let Ok(_) = headfile.read_exact(&mut buf) else {
-        return false;
-    };
     let Ok(hash) = String::from_utf8(buf) else {
         return false;
     };
 
     let Ok(head_commit) = Commit::load(&hash) else {
+        dbg!(&hash);
         return false;
     };
 
@@ -241,6 +233,34 @@ mod tests {
             let res = find_working_tree_dir(fp);
 
             assert!(res.is_err());
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_is_tracked_by_head() -> Result<()> {
+        let tmpdir = assert_fs::TempDir::new()?;
+        test_utils::set_dir(&tmpdir, || {
+            std::fs::create_dir_all(".gitlet/commits/9f").context("Create .gitlet/commits/9f")?;
+            let mut f =
+                std::fs::File::create(".gitlet/commits/9f/58103e11b63e5ccca06154ab8838be7639a574")
+                    .context("Create commit file")?;
+
+            let json = serde_json::json!({
+                "hash":"9f58103e11b63e5ccca06154ab8838be7639a574",
+                "parent":"",
+                "merge_parent":"",
+                "message":"first commit",
+                "timestamp":1755104961,
+                "blobs":{"b.txt":{"hash":"02d92c580d4ede6c80a878bdd9f3142d8f757be8"}}
+            });
+            serde_json::to_writer(&mut f, &json).context("Write commit json")?;
+
+            let _f = std::fs::File::create(".gitlet/HEAD").context("Create HEAD file")?;
+            update_head("9f58103e11b63e5ccca06154ab8838be7639a574")?;
+
+            assert!(is_tracked_by_head(Path::new("b.txt")));
 
             Ok(())
         })

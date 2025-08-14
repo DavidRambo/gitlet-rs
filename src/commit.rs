@@ -15,7 +15,7 @@ use sha1::{Digest, Sha1};
 use crate::blob::{self, Blob};
 use crate::{index, repo};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct Commit {
     pub(crate) hash: String,
     parent: String,
@@ -85,21 +85,33 @@ impl Commit {
 
     /// Loads the commit object with the given identifying sha1 hash.
     pub(crate) fn load(hash: &str) -> Result<Self> {
+        // For before first commit and the HEAD is empty.
+        // NOTE: in the Gitlet spec, initializing a new repo creates an empty first commit.
+        if hash.is_empty() {
+            return Ok(Commit {
+                hash: String::default(),
+                parent: String::default(),
+                merge_parent: String::default(),
+                message: String::default(),
+                timestamp: 0,
+                blobs: HashMap::default(),
+            });
+        }
+
         let commit_path = repo::abs_path_to_repo_root()?
             .join(".gitlet/commits")
             .join(&hash[..2])
             .join(&hash[2..]);
 
-        if let Ok(mut f) = fs::File::open(&commit_path) {
-            let stat = fs::metadata(&commit_path).context("Stat the saved commit file")?;
-            let mut content = String::with_capacity(stat.len() as usize);
-            f.read_to_string(&mut content)?;
-            let commit: Commit =
-                serde_json::from_str(&content).context("Deserialize commit file into memory")?;
-            Ok(commit)
-        } else {
-            anyhow::bail!("Invalid commit");
-        }
+        let mut f = fs::File::open(&commit_path).context("Open commit file")?;
+
+        let stat = fs::metadata(&commit_path).context("Stat the saved commit file")?;
+        let mut content = String::with_capacity(stat.len() as usize);
+        f.read_to_string(&mut content)
+            .context("Read commit file content to string")?;
+        let commit: Commit =
+            serde_json::from_str(&content).context("Deserialize commit file into memory")?;
+        Ok(commit)
     }
 
     /// Writes the commit object to the repository.

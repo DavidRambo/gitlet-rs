@@ -17,7 +17,7 @@ use crate::repo;
 /// Represents a blob, which is the gitlet object for a tracked file.
 /// 'id': 40-char String produced by the Sha1 hash
 /// 'blobpath': Path to the blob
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct Blob {
     pub(crate) hash: String,
 }
