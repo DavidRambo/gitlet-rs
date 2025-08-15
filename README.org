@@ -25,7 +25,6 @@
   - [ ] retrieve untracked files
   - [ ] retrieve unstaged modified files
   - [ ] status: staged file with later changes
-  - [ ] remove blobs that have been unstaged and restaged if they are not part of a prior commit (this will likely require dedicating a separate subdir for staged blobs)
   - [ ] checkout
   - [ ] branch
   - [X] status: current branch

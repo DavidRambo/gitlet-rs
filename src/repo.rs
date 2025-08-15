@@ -1,5 +1,6 @@
 //! This module provides methods for creating a new repository and for interacting with an existing one.
 
+use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::io::Read;
@@ -10,6 +11,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use anyhow::Result;
 use anyhow::anyhow;
+use walkdir::WalkDir;
 
 use crate::commit::Commit;
 use crate::index;
@@ -188,18 +190,58 @@ pub fn log() -> Result<()> {
     Ok(())
 }
 
+/// Returns a set of non-hidden filepaths in the working tree.
+///
+/// Snippet to skip hidden files: https://docs.rs/walkdir/latest/walkdir/#example-skip-hidden-files-and-directories-on-unix
+fn working_files() -> Result<Vec<PathBuf>> {
+    let repo_root = abs_path_to_repo_root().context("Get repository root directory")?;
+    let all_files = WalkDir::new(&repo_root)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|e| {
+            e.file_type().is_file()
+                && e.file_name()
+                    .to_str()
+                    .map(|s| !s.starts_with("."))
+                    .unwrap_or(false)
+        })
+        .map(|e| PathBuf::from(e.path().strip_prefix(&repo_root).unwrap()))
+        .collect();
+
+    Ok(all_files)
+}
+
+/// Returns a set of blobs tracked by the current commit.
+fn tracked_blobs() -> Result<HashSet<String>> {
+    todo!()
+}
+
+fn unstaged_modifications() -> Result<HashSet<String>> {
+    todo!()
+}
+
+fn untracked_files() -> Result<Vec<String>> {
+    todo!()
+}
+
+fn diff_from_staged(a: &Path, b: &Path) -> bool {
+    todo!()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_utils;
+
+    use std::fs;
 
     #[test]
     fn create_rel_path_from_repo_root() -> Result<()> {
         let tmpdir = assert_fs::TempDir::new()?;
 
         test_utils::set_dir(&tmpdir, || {
-            std::fs::create_dir(".gitlet")?;
-            std::fs::File::create("t.txt")?;
+            fs::create_dir(".gitlet")?;
+            fs::File::create("t.txt")?;
 
             let fp = std::path::Path::new("t.txt");
             let res = find_working_tree_dir(fp)?;
@@ -215,9 +257,9 @@ mod tests {
         let tmpdir = assert_fs::TempDir::new()?;
 
         test_utils::set_dir(&tmpdir, || {
-            std::fs::create_dir(".gitlet")?;
-            std::fs::create_dir("a")?;
-            std::fs::File::create("a/t.txt")?;
+            fs::create_dir(".gitlet")?;
+            fs::create_dir("a")?;
+            fs::File::create("a/t.txt")?;
 
             std::env::set_current_dir("a").context("set current dir to 'tmpdir/a/'")?;
             let fp = std::path::Path::new("t.txt");
@@ -234,8 +276,8 @@ mod tests {
         let tmpdir = assert_fs::TempDir::new()?;
 
         test_utils::set_dir(&tmpdir, || {
-            std::fs::create_dir("a")?;
-            std::fs::File::create("a/t.txt")?;
+            fs::create_dir("a")?;
+            fs::File::create("a/t.txt")?;
 
             std::env::set_current_dir("a").context("set current dir to 'tmpdir/a/'")?;
             let fp = std::path::Path::new("t.txt");
@@ -251,9 +293,9 @@ mod tests {
     fn test_is_tracked_by_head() -> Result<()> {
         let tmpdir = assert_fs::TempDir::new()?;
         test_utils::set_dir(&tmpdir, || {
-            std::fs::create_dir_all(".gitlet/commits/9f").context("Create .gitlet/commits/9f")?;
+            fs::create_dir_all(".gitlet/commits/9f").context("Create .gitlet/commits/9f")?;
             let mut f =
-                std::fs::File::create(".gitlet/commits/9f/58103e11b63e5ccca06154ab8838be7639a574")
+                fs::File::create(".gitlet/commits/9f/58103e11b63e5ccca06154ab8838be7639a574")
                     .context("Create commit file")?;
 
             let json = serde_json::json!({
@@ -266,10 +308,59 @@ mod tests {
             });
             serde_json::to_writer(&mut f, &json).context("Write commit json")?;
 
-            let _f = std::fs::File::create(".gitlet/HEAD").context("Create HEAD file")?;
+            let _f = fs::File::create(".gitlet/HEAD").context("Create HEAD file")?;
             update_head("9f58103e11b63e5ccca06154ab8838be7639a574")?;
 
             assert!(is_tracked_by_head(Path::new("b.txt")));
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn flat_working_files() -> Result<()> {
+        let tmpdir = assert_fs::TempDir::new()?;
+        test_utils::set_dir(&tmpdir, || {
+            fs::create_dir(".gitlet")?;
+            fs::File::create("a.txt")?;
+            fs::File::create("b.txt")?;
+
+            let expected: Vec<PathBuf> = ["a.txt", "b.txt"]
+                .into_iter()
+                .rev()
+                .map(|t| std::path::PathBuf::from(t))
+                .collect();
+
+            let actual = working_files()?;
+
+            assert_eq!(expected, actual);
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn nested_working_files() -> Result<()> {
+        let tmpdir = assert_fs::TempDir::new()?;
+        test_utils::set_dir(&tmpdir, || {
+            let filenames = ["a.txt", "b.txt", "one/c.txt", "one/d.txt", "one/two/e.txt"];
+
+            fs::create_dir(".gitlet")?;
+            fs::create_dir_all("one/two")?;
+            fs::File::create(".gitletignore")?;
+            for f in filenames {
+                fs::File::create(f)?;
+            }
+
+            let expected: Vec<PathBuf> = filenames
+                .into_iter()
+                .rev()
+                .map(|t| std::path::PathBuf::from(t))
+                .collect();
+
+            let actual = working_files()?;
+
+            assert_eq!(expected, actual);
 
             Ok(())
         })
