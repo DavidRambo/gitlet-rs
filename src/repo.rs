@@ -159,24 +159,33 @@ fn update_head(hash: &str) -> Result<()> {
 ///
 /// A file is tracked if it is represented either by the HEAD commit or by the index.
 pub(crate) fn is_tracked_by_head(filepath: &Path) -> bool {
-    let Ok(repo_root) = abs_path_to_repo_root() else {
-        return false;
-    };
-
-    let Ok(buf) = std::fs::read(repo_root.join(".gitlet/HEAD")) else {
-        return false;
-    };
-
-    let Ok(hash) = String::from_utf8(buf) else {
-        return false;
-    };
-
-    let Ok(head_commit) = Commit::load(&hash) else {
-        dbg!(&hash);
+    let Ok(head_commit) = retrieve_head_commit() else {
         return false;
     };
 
     head_commit.tracks(filepath)
+}
+
+/// Returns the commit referenced by the HEAD file's hash.
+fn retrieve_head_commit() -> Result<Commit> {
+    let repo_root = abs_path_to_repo_root()?;
+
+    let buf = std::fs::read(repo_root.join(".gitlet/HEAD"))?;
+
+    let hash = String::from_utf8(buf)?;
+
+    let head_commit = Commit::load(&hash)?;
+
+    Ok(head_commit)
+}
+
+/// Prints out a log of the commit history starting from the HEAD.
+pub fn log() -> Result<()> {
+    let head_commit = retrieve_head_commit().context("Retrieve head commit for log")?;
+    for c in head_commit.iter() {
+        println!("{}", c);
+    }
+    Ok(())
 }
 
 #[cfg(test)]

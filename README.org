@@ -20,7 +20,7 @@
   - [X] commit: HEAD
   - [X] commit: handle removed files
   - [X] commit: impl Display for log command
-  - [ ] log
+  - [X] log
   - [ ] retrieve tracked files
   - [ ] retrieve untracked files
   - [ ] retrieve unstaged modified files

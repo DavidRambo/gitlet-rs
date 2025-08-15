@@ -39,6 +39,9 @@ enum Commands {
 
     /// Commits the staged changes to the gitlet repository
     Commit { message: String },
+
+    /// Prints a log of the commit history starting from the HEAD.
+    Log,
 }
 
 fn main() -> Result<()> {
@@ -51,6 +54,7 @@ fn main() -> Result<()> {
         Commands::Rm { cached, filepath } => index::rm(cached, &filepath)?,
         Commands::Status => repo::status()?,
         Commands::Commit { message } => repo::commit(message)?,
+        Commands::Log => repo::log()?,
     }
 
     Ok(())
