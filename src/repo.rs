@@ -183,7 +183,7 @@ fn retrieve_head_commit() -> Result<Commit> {
 pub fn log() -> Result<()> {
     let head_commit = retrieve_head_commit().context("Retrieve head commit for log")?;
     for c in head_commit.iter() {
-        println!("{}", c);
+        println!("{c}");
     }
     Ok(())
 }

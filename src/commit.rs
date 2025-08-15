@@ -163,22 +163,13 @@ impl Display for Commit {
         let date = DateTime::from_timestamp(self.timestamp as i64, 0).unwrap();
         buf.push_str(&date.to_rfc2822());
 
-        buf.push_str("\n");
+        buf.push('\n');
         buf.push_str(&self.message);
-        buf.push_str("\n");
+        buf.push('\n');
 
         write!(f, "{buf}")
     }
 }
-
-// TODO: Implement the data types and processes for displaying the gitlet log.
-// It would be very cool to do it with an iterator (i.e. external iteration).
-// The challenge is to handle merge commits. So, when the commit has a merge_parent,
-// the next hash is whichever is most recent. Thus, with each successive iteration,
-// the timestamps are displayed, and the greater of the two is next. However, the
-// merged branch will have its own commit history, which will ultimately reach the
-// point of divergence. So in addition to checking for recency, the hashes themselves
-// must be compared. If they are equal, then drop the second hash held in reserve.
 
 /// Data type for iterating through the commit history for the gitlet log command.
 ///
@@ -190,13 +181,6 @@ pub(crate) struct CommitIter {
     parent_hash: Option<String>,
     merge_hash: Option<String>,
 }
-// TODO: Make this self-referential using a Box so that I don't need so many clone() calls.
-// Instead, I could do *self = *parent_hash, where parent_hash = Option<Box<CommitIter>>
-// However, this will require implementing new() for CommitIter so that it will know how
-// to populate its fields whenever a new parent is required.
-//
-// See: https://aloso.github.io/2021/03/09/creating-an-iterator for an example that uses Default
-// and mem::take() for creating new parent node iterator data types in a tree traversal iterator.
 
 impl Commit {
     pub fn iter(&self) -> CommitIter {
@@ -214,9 +198,7 @@ impl Iterator for CommitIter {
     type Item = Commit;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current_hash.is_none() {
-            return None;
-        }
+        self.current_hash.as_ref()?;
 
         // NOTE: This does not accommodate when a merge_parent is itself a merge commit.
         let output_hash = match (&self.parent_hash, &self.merge_hash) {
@@ -228,13 +210,13 @@ impl Iterator for CommitIter {
             (None, Some(hash)) => {
                 let output_hash = self.current_hash.clone();
                 self.current_hash = self.merge_hash.clone();
-                (self.parent_hash, self.merge_hash) = get_parent_hashes(&hash);
+                (self.parent_hash, self.merge_hash) = get_parent_hashes(hash);
                 output_hash
             }
             (Some(hash), None) => {
                 let output_hash = self.current_hash.clone();
                 self.current_hash = self.parent_hash.clone();
-                (self.parent_hash, self.merge_hash) = get_parent_hashes(&hash);
+                (self.parent_hash, self.merge_hash) = get_parent_hashes(hash);
                 output_hash
             }
             (Some(parent), Some(merge)) =>
@@ -245,9 +227,9 @@ impl Iterator for CommitIter {
                 if parent == merge {
                     // Reached point of divergence in history.
                     self.current_hash = self.parent_hash.clone();
-                    (self.parent_hash, self.merge_hash) = get_parent_hashes(&parent);
+                    (self.parent_hash, self.merge_hash) = get_parent_hashes(parent);
                 } else {
-                    let recent_hash = more_recent_hash(&parent, &merge);
+                    let recent_hash = more_recent_hash(parent, merge);
                     // Possibilities:
                     // None => Fill in all with None.
                     // parent => current = parent, parent = parent's parent, merge stays
@@ -256,10 +238,10 @@ impl Iterator for CommitIter {
                         Some(hash) => {
                             if hash == *parent {
                                 self.current_hash = Some(parent.clone());
-                                (self.parent_hash, _) = get_parent_hashes(&parent);
+                                (self.parent_hash, _) = get_parent_hashes(parent);
                             } else {
                                 self.current_hash = Some(merge.clone());
-                                (self.merge_hash, _) = get_parent_hashes(&merge);
+                                (self.merge_hash, _) = get_parent_hashes(merge);
                             }
                         }
                         None => {
@@ -273,11 +255,7 @@ impl Iterator for CommitIter {
                 output_hash
             }
         };
-        if let Ok(c) = Commit::load(&output_hash.unwrap()) {
-            Some(c)
-        } else {
-            None
-        }
+        Commit::load(&output_hash.unwrap()).ok()
     }
 }
 
@@ -286,7 +264,7 @@ fn get_parent_hashes(hash: &str) -> (Option<String>, Option<String>) {
         return (None, None);
     }
 
-    let Ok(commit) = Commit::load(&hash) else {
+    let Ok(commit) = Commit::load(hash) else {
         return (None, None);
     };
 
