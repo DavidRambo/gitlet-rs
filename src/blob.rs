@@ -111,10 +111,10 @@ impl Blob {
         Ok(())
     }
 
-    /// Compares its hash to the hash of another filepath.
+    /// Returns true (wrapped as a result) if its hash equals that of the other file's.
     ///
     /// Note: the filepath must be either relative to the current working directory or absolute.
-    pub fn cmp(&self, fpath: &path::Path) -> Result<bool> {
+    pub fn hash_same_as_other_file(&self, fpath: &path::Path) -> Result<bool> {
         let other = Blob::new(fpath).context("Create blob of other filepath")?;
 
         Ok(self.hash == other.hash)
