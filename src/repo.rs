@@ -70,7 +70,7 @@ pub fn status() -> Result<()> {
 ///
 /// This is useful for nested directory structures as well as for stripping arbitrary parent paths,
 /// such as with absolute paths.
-pub(crate) fn find_working_tree_dir(filepath: &std::path::Path) -> Result<PathBuf> {
+pub(crate) fn find_working_tree_dir(filepath: &path::Path) -> Result<PathBuf> {
     let filepath = std::fs::canonicalize(filepath).with_context(|| {
         format!(
             "Creating absolute path for filepath: '{}'",
@@ -110,6 +110,13 @@ pub(crate) fn abs_path_to_repo_root() -> Result<PathBuf> {
     anyhow::ensure!(found, "Not a valid gitlet repository");
 
     Ok(curr_dir)
+}
+
+/// Returns the absolute path of the file in the working tree.
+fn abs_path_working_file(fp: &path::Path) -> Result<path::PathBuf> {
+    let mut repo_root = abs_path_to_repo_root()?;
+    repo_root.push(fp);
+    Ok(repo_root)
 }
 
 /// Commits the staged changes to the repository.
@@ -162,17 +169,19 @@ pub(crate) fn is_tracked_by_head(filepath: &Path) -> bool {
     head_commit.tracks(filepath)
 }
 
-/// Returns the commit referenced by the HEAD file's hash.
-fn retrieve_head_commit() -> Result<Commit> {
+fn read_head_hash() -> Result<String> {
     let repo_root = abs_path_to_repo_root()?;
 
     let buf = std::fs::read(repo_root.join(".gitlet/HEAD"))?;
 
     let hash = String::from_utf8(buf)?;
 
-    let head_commit = Commit::load(&hash)?;
+    Ok(hash)
+}
 
-    Ok(head_commit)
+/// Returns the commit referenced by the HEAD file's hash.
+fn retrieve_head_commit() -> Result<Commit> {
+    Commit::load(&read_head_hash()?)
 }
 
 /// Prints out a log of the commit history starting from the HEAD.
