@@ -193,7 +193,7 @@ pub fn log() -> Result<()> {
     Ok(())
 }
 
-/// Returns a set of non-hidden filepaths in the working tree.
+/// Returns all non-hidden filepaths in the working tree.
 ///
 /// Snippet to skip hidden files: https://docs.rs/walkdir/latest/walkdir/#example-skip-hidden-files-and-directories-on-unix
 fn working_files() -> Result<Vec<PathBuf>> {
