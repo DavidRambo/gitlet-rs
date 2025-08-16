@@ -21,8 +21,9 @@
   - [X] commit: handle removed files
   - [X] commit: impl Display for log command
   - [X] log
-  - [ ] retrieve tracked files
-  - [ ] retrieve untracked files
+  - [X] retrieve working tree files
+  - [X] retrieve tracked files
+  - [X] retrieve untracked files
   - [ ] retrieve unstaged modified files
   - [ ] status: staged file with later changes
   - [ ] checkout
