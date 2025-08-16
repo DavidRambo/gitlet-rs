@@ -1,20 +1,14 @@
 //! This module provides methods for creating a new repository and for interacting with an existing one.
 
-use std::collections::HashSet;
 use std::fs;
-use std::io;
-use std::io::Read;
-use std::io::Write;
-use std::path::Path;
-use std::path::PathBuf;
+use std::io::{self, Read, Write};
+use std::path::{self, Path, PathBuf};
 
-use anyhow::Context;
-use anyhow::Result;
-use anyhow::anyhow;
+use anyhow::{Context, Result, anyhow};
 use walkdir::WalkDir;
 
-use crate::commit::Commit;
-use crate::index;
+use crate::commit::{Commit, get_commit_blobs};
+use crate::index::{self, Index};
 
 /// Initializes a new gitlet repository. `repo_path` is an optional argument passed to
 /// `gitlet init` to specify the directory for the new repository. It defaults to the PWD.
