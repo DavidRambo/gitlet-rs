@@ -2,8 +2,15 @@
   A simple git-like version control CLI written in Rust and inspired by UC Berkeley's Gitlet project (an assignment in a course that uses Java).
   I'm writing this for my own edification, as it is a nice project for TTD of a CLI app.
 
+** Differences from the original Gitlet spec
+   - Gitlet initializes with a commit, which eliminates special cases for loading a hash from the HEAD file and providing a parent commit hash to the first commit. This implementation does not establish an initial, empty commit.
+   - Gitlet does not support nested directory structures, whereas this implementation does.
+   - This implementation also supports calling gitlet commands from anywhere within the working tree, not only at the root.
+   - Gitlet uses a single command, `remove`, to handle unstaging staged files and deleting them from the repo. This implementation adheres more closely to Git in that it provides a `rm` command with a `--cached` option.
+   - Gitlet lists all branches with its `status` command, including an asterisk next to the current branch. This implementation only shows the current branch with `status` and shows all branches with the `branch` command.
+
 ** Related projects
-   After doing it in Java, I implemented it [in Python](https://github.com/DavidRambo/gitlepy).
+   After doing it in Java, I implemented it in Python as [Gitlepy](https://github.com/DavidRambo/gitlepy).
 
 * TODOs
   - [X] cli arg parser
