@@ -7,7 +7,10 @@ use std::{
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::{blob::Blob, repo};
+use crate::{
+    blob::Blob,
+    repo::{self, abs_path_to_repo_root},
+};
 
 #[derive(Default, Deserialize, Serialize)]
 pub(crate) struct Index {
@@ -140,19 +143,18 @@ pub fn action(action: IndexAction, filepath: &str) -> Result<()> {
 
 /// Removes file from the working tree and stages it for removal, or, if 'cached' is true, then
 /// only untracks the file.
-pub fn rm(cached: bool, filepath: &str) -> Result<()> {
-    let mut index = Index::load()?;
+pub fn rm(cached: bool, file_name: &str) -> Result<()> {
+    let f = path::Path::new(file_name);
 
-    let f = path::PathBuf::from(filepath);
-    // If the file has been deleted from the working tree by a previous `gitlet rm`, then this will
-    // trigger.
-    anyhow::ensure!(f.exists(), "Cannot remove file. File does not exist.");
-
-    let fpath_from_root = repo::find_working_tree_dir(&f)?;
-
-    if index.removals.contains(&fpath_from_root) {
-        anyhow::bail!("File already staged for removal");
+    // In case deleted file needs to be unstaged and/or untracked.
+    if !f.exists() {
+        return rm_deleted(f);
     }
+
+    let fpath_from_root =
+        repo::find_working_tree_dir(&f).context("Create filepath from repo root")?;
+
+    let mut index = Index::load().context("Load index")?;
 
     // Check whether file is tracked.
     if !index.additions.contains_key(&fpath_from_root)
@@ -184,10 +186,42 @@ pub fn rm(cached: bool, filepath: &str) -> Result<()> {
         }
 
         // Remove from the working tree.
-        std::fs::remove_file(filepath).context("Delete file from working tree")?;
+        std::fs::remove_file(file_name).context("Delete file from working tree")?;
     }
 
     Ok(())
+}
+
+/// Updates the staging area to reflect the removal of a deleted file.
+fn rm_deleted(f: &path::Path) -> Result<()> {
+    let abs_fp = path::absolute(&f).context("Create absolute path to file name")?;
+    let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root dir")?;
+    let repo_file = abs_fp
+        .strip_prefix(&repo_root)
+        .context("Strip absolute path prefix")?;
+
+    let mut index = Index::load().context("Load index")?;
+
+    // Stop if file is not tracked.
+    if !index.additions.contains_key(repo_file) && !repo::is_tracked_by_head(repo_file) {
+        println!("Cannot remove file. The file is not tracked.");
+        return Ok(());
+    }
+
+    // Unstage the file if it is staged.
+    // Store result for output to user.
+    let unstage_res = index.additions.remove(repo_file);
+
+    // If it is not already in removals and is also tracked, then stage it for removal.
+    if !index.removals.contains(repo_file) && repo::is_tracked_by_head(repo_file) {
+        index.removals.insert(repo_file.to_path_buf());
+    } else if unstage_res.is_some() {
+        println!("Removed deleted file from staging area.");
+    } else {
+        println!("File already staged for removal.");
+    }
+    index.save()?;
+    return Ok(());
 }
 
 #[cfg(test)]

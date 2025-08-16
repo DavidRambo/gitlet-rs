@@ -13,6 +13,7 @@
   - [X] staging area (i.e. the Index)
   - [X] add
   - [X] rm
+  - [X] add/rm already deleted tracked file
   - [X] restore
   - [X] status: additions and removals
   - [X] `stage` should write blob so that further modifications are separate
@@ -24,8 +25,7 @@
   - [X] retrieve working tree files
   - [X] retrieve tracked files
   - [X] retrieve untracked files
-  - [ ] retrieve unstaged modified files
-  - [ ] status: staged file with later changes
+  - [X] status: staged file with later changes
   - [ ] checkout
   - [ ] branch
   - [X] status: current branch

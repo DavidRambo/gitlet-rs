@@ -75,7 +75,8 @@ pub fn status() -> Result<()> {
 /// For example, given a path `/var/tmp/work/sub/t.rs`, and assuming `/var/tmp/work/.gitlet`, the
 /// function would return "sub/t.rs".
 ///
-/// It returns an error if there is no Gitlet repository.
+/// # Panics
+/// It returns an error if there is no Gitlet repository or if the filepath does not exist.
 ///
 /// This is useful for nested directory structures as well as for stripping arbitrary parent paths,
 /// such as with absolute paths.
@@ -223,15 +224,15 @@ fn working_files() -> Result<Vec<PathBuf>> {
     Ok(all_files)
 }
 
-/// Returns names of files that are tracked and have been changed but not staged, including deleted
-/// files, which are marked as such.
+/// Returns names of files that are tracked (either by the HEAD or by the index) and have been
+/// changed but not staged, including deleted files, which are marked as such.
 fn unstaged_modifications() -> Result<Vec<String>> {
     let mut unstaged: Vec<String> = Vec::new();
 
     // Iterate through all tracked files in the working tree, comparing current hash with both HEAD
     // and index.
     let working_files = working_files().context("Collect filepaths in working tree")?;
-    let index = Index::load()?;
+    let index = Index::load().context("Load index")?;
 
     for (f, tracked_blob) in get_commit_blobs(&read_head_hash()?)
         .context("Get HEAD blobs map")?
@@ -269,6 +270,8 @@ fn unstaged_modifications() -> Result<Vec<String>> {
         }
     }
 
+    // Iterate through all new files staged for addition, pushing those that have since been
+    // modified.
     for (f, staged_blob) in index
         .additions
         .iter()
@@ -278,7 +281,7 @@ fn unstaged_modifications() -> Result<Vec<String>> {
             let mut deleted_file = String::from(f.to_str().unwrap());
             deleted_file.push_str(" (deleted)");
             unstaged.push(deleted_file);
-        } else if !staged_blob.hash_same_as_other_file(f).unwrap_or(false) {
+        } else if !staged_blob.hash_same_as_other_file(f).unwrap_or(true) {
             unstaged.push(String::from(f.to_str().unwrap()));
         }
     }
@@ -290,10 +293,13 @@ fn unstaged_modifications() -> Result<Vec<String>> {
 fn untracked_files() -> Result<Vec<PathBuf>> {
     let working_files = working_files().context("Collect filepaths in working tree")?;
     let head_commit = retrieve_head_commit().context("Load HEAD Commit")?;
+    let index = Index::load().context("Load index")?;
     Ok(working_files
         .into_iter()
         .filter(|fp| {
-            fp.to_str().map(|s| !s.starts_with(".")).unwrap_or(false) && !head_commit.tracks(fp)
+            fp.to_str().map(|s| !s.starts_with(".")).unwrap_or(false)
+                && !head_commit.tracks(fp)
+                && !index.additions.contains_key(fp)
         })
         .collect())
 }
