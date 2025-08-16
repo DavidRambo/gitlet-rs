@@ -214,17 +214,21 @@ fn working_files() -> Result<Vec<PathBuf>> {
     Ok(all_files)
 }
 
-/// Returns a set of blobs tracked by the current commit.
-fn tracked_blobs() -> Result<HashSet<String>> {
-    todo!()
-}
 
 fn unstaged_modifications() -> Result<HashSet<String>> {
     todo!()
 }
 
-fn untracked_files() -> Result<Vec<String>> {
-    todo!()
+/// Returns filepaths in the working tree that are not tracked by the currently checked out commit.
+fn untracked_files() -> Result<Vec<PathBuf>> {
+    let working_files = working_files().context("Collect filepaths in working tree")?;
+    let head_commit = retrieve_head_commit().context("Load HEAD Commit")?;
+    Ok(working_files
+        .into_iter()
+        .filter(|fp| {
+            fp.to_str().map(|s| !s.starts_with(".")).unwrap_or(false) && !head_commit.tracks(fp)
+        })
+        .collect())
 }
 
 fn diff_from_staged(a: &Path, b: &Path) -> bool {
