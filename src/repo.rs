@@ -52,9 +52,18 @@ pub fn status() -> Result<()> {
 
     index::status(&mut buf_handle)?;
 
-    // TODO: Changes not staged for commit.
-    // Cross-reference existing files with HEAD's files.
-    // Cross-reference HEAD's files with working tree to check for deletions.
+    writeln!(buf_handle, "\n=== Unstaged Modifications ===")?;
+    let unstaged = unstaged_modifications().context("Collect unstaged modified files")?;
+    for entry in unstaged {
+        writeln!(buf_handle, "{}", &entry)?;
+    }
+
+    writeln!(buf_handle, "\n=== Untracked Files ===")?;
+    for entry in untracked_files().context("Collect untracked files in working tree")? {
+        writeln!(buf_handle, "{}", &entry.display())?;
+    }
+
+    writeln!(buf_handle)?;
 
     buf_handle.flush()?;
 
@@ -214,9 +223,67 @@ fn working_files() -> Result<Vec<PathBuf>> {
     Ok(all_files)
 }
 
+/// Returns names of files that are tracked and have been changed but not staged, including deleted
+/// files, which are marked as such.
+fn unstaged_modifications() -> Result<Vec<String>> {
+    let mut unstaged: Vec<String> = Vec::new();
 
-fn unstaged_modifications() -> Result<HashSet<String>> {
-    todo!()
+    // Iterate through all tracked files in the working tree, comparing current hash with both HEAD
+    // and index.
+    let working_files = working_files().context("Collect filepaths in working tree")?;
+    let index = Index::load()?;
+
+    for (f, tracked_blob) in get_commit_blobs(&read_head_hash()?)
+        .context("Get HEAD blobs map")?
+        .iter()
+    {
+        // If file is in neither the working tree nor staged removals, then it has been deleted.
+        if !working_files.contains(f) && !index.removals.contains(f) {
+            let mut deleted_file = String::from(f.to_str().unwrap());
+            deleted_file.push_str(" (deleted)");
+            unstaged.push(deleted_file);
+        } else if working_files.contains(f) {
+            // Render the filepath to be absolute.
+            let abs_fpath = abs_path_working_file(f).context("Create absolute path to file")?;
+
+            // Compare first to the index, in case the changes have already been staged.
+            // Then compare to last commited blob.
+            if index.additions.contains_key(f)
+                && !index
+                    .additions
+                    .get(f)
+                    .unwrap()
+                    .hash_same_as_other_file(&abs_fpath)
+                    .unwrap_or(false)
+            {
+                // File has been staged for addition and subsequently changed.
+                unstaged.push(String::from(f.to_str().unwrap()));
+            } else if !index.additions.contains_key(f)
+                && !tracked_blob
+                    .hash_same_as_other_file(&abs_fpath)
+                    .context("Compare current file to recent commit version")?
+            {
+                // File has been modified but not staged for addition.
+                unstaged.push(String::from(f.to_str().unwrap()));
+            }
+        }
+    }
+
+    for (f, staged_blob) in index
+        .additions
+        .iter()
+        .filter(|(k, _)| !is_tracked_by_head(k))
+    {
+        if !working_files.contains(f) {
+            let mut deleted_file = String::from(f.to_str().unwrap());
+            deleted_file.push_str(" (deleted)");
+            unstaged.push(deleted_file);
+        } else if !staged_blob.hash_same_as_other_file(f).unwrap_or(false) {
+            unstaged.push(String::from(f.to_str().unwrap()));
+        }
+    }
+
+    Ok(unstaged)
 }
 
 /// Returns filepaths in the working tree that are not tracked by the currently checked out commit.
@@ -229,10 +296,6 @@ fn untracked_files() -> Result<Vec<PathBuf>> {
             fp.to_str().map(|s| !s.starts_with(".")).unwrap_or(false) && !head_commit.tracks(fp)
         })
         .collect())
-}
-
-fn diff_from_staged(a: &Path, b: &Path) -> bool {
-    todo!()
 }
 
 #[cfg(test)]
