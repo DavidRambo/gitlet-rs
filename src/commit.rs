@@ -36,10 +36,11 @@ impl Commit {
         index: index::Index,
     ) -> Result<Self> {
         // Check in case this is the first commit.
-        let mut blobs: HashMap<PathBuf, Blob> = HashMap::new();
-        if !parent.is_empty() {
-            blobs = get_commit_blobs(&parent)?;
-        }
+        let blobs = if !parent.is_empty() {
+            get_commit_blobs(&parent)?
+        } else {
+            HashMap::new()
+        };
 
         let mut blobs: HashMap<PathBuf, Blob> = blobs
             .into_iter()
