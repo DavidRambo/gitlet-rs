@@ -33,9 +33,11 @@
   - [X] retrieve tracked files
   - [X] retrieve untracked files
   - [X] status: staged file with later changes
-  - [ ] checkout
+  - [ ] initialize a main branch
+  - [ ] refactor HEAD to point to checked out branch file, which contains its head commit
+  - [ ] status: current branch
   - [ ] branch
-  - [X] status: current branch
+  - [ ] checkout
   - [ ] switch [-c]
   - [ ] merge
   - [ ] add headers to gitlet objects (as in git)
