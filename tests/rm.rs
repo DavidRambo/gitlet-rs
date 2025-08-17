@@ -134,16 +134,20 @@ fn rm_already_removed() -> Result<(), Box<dyn Error>> {
     cmd.current_dir(&tmpdir).arg("commit").arg("test commit");
     cmd.assert().success();
 
+    // Delete file from working tree and add it to 'removals' in staging area.
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("rm").arg("a.txt");
-    cmd.assert().success();
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("rm 'a.txt'"));
+    assert!(!std::fs::exists(tmpdir.join("a.txt"))?);
 
     // Will not show up as already staged for removal because the file has been deleted.
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("rm").arg("a.txt");
-    cmd.assert().failure().stderr(predicate::str::contains(
-        "Cannot remove file. File does not exist.",
-    ));
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("File already staged for removal."));
 
     Ok(())
 }

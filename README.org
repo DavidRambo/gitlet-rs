@@ -39,6 +39,7 @@
   - [ ] branch
   - [ ] checkout
   - [ ] switch [-c]
+  - [ ] support for detached HEAD (i.e. directly checkout a commit and not a branch)
   - [ ] merge
   - [ ] add headers to gitlet objects (as in git)
 

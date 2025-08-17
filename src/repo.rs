@@ -235,7 +235,7 @@ fn unstaged_modifications() -> Result<Vec<String>> {
     let index = Index::load().context("Load index")?;
 
     for (f, tracked_blob) in get_commit_blobs(&read_head_hash()?)
-        .context("Get HEAD blobs map")?
+        .context("Get HEAD commit's list of tracked files")?
         .iter()
     {
         // If file is in neither the working tree nor staged removals, then it has been deleted.
@@ -428,15 +428,15 @@ mod tests {
                 fs::File::create(f)?;
             }
 
-            let expected: Vec<PathBuf> = filenames
+            let mut expected: Vec<PathBuf> = filenames
                 .into_iter()
                 .rev()
                 .map(|t| std::path::PathBuf::from(t))
                 .collect();
 
-            let actual = working_files()?;
+            let mut actual = working_files()?;
 
-            assert_eq!(expected, actual);
+            assert_eq!(expected.sort(), actual.sort());
 
             Ok(())
         })

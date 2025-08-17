@@ -173,11 +173,6 @@ pub fn rm(cached: bool, file_name: &str) -> Result<()> {
             blob.delete()?;
         }
 
-        // Only need to stage for removal if it is tracked by the current commit.
-        if repo::is_tracked_by_head(&fpath_from_root) {
-            index.removals.insert(fpath_from_root);
-        }
-
         index.save().context("Save staging area to index")?;
     } else {
         // Per git, cannot rm a file that has changes staged for commit.
@@ -189,10 +184,20 @@ pub fn rm(cached: bool, file_name: &str) -> Result<()> {
         std::fs::remove_file(file_name).context("Delete file from working tree")?;
     }
 
+    // Only need to stage for removal if it is tracked by the current commit.
+    if repo::is_tracked_by_head(&fpath_from_root) {
+        index.removals.insert(fpath_from_root);
+        index
+            .save()
+            .context("Save index after inserting to removals")?;
+    }
+
+    println!("rm '{file_name}'");
+
     Ok(())
 }
 
-/// Updates the staging area to reflect the removal of a deleted file.
+/// Updates the staging area, if necessary, to reflect the removal of a deleted file.
 fn rm_deleted(f: &path::Path) -> Result<()> {
     let abs_fp = path::absolute(&f).context("Create absolute path to file name")?;
     let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root dir")?;
@@ -204,21 +209,19 @@ fn rm_deleted(f: &path::Path) -> Result<()> {
 
     // Stop if file is not tracked.
     if !index.additions.contains_key(repo_file) && !repo::is_tracked_by_head(repo_file) {
-        println!("Cannot remove file. The file is not tracked.");
-        return Ok(());
+        anyhow::bail!("Cannot remove file. The file is not tracked.");
     }
-
-    // Unstage the file if it is staged.
-    // Store result for output to user.
-    let unstage_res = index.additions.remove(repo_file);
+    // File is _either_ staged for addition _or_ tracked; it _could_ be in removals.
 
     // If it is not already in removals and is also tracked, then stage it for removal.
     if !index.removals.contains(repo_file) && repo::is_tracked_by_head(repo_file) {
         index.removals.insert(repo_file.to_path_buf());
-    } else if unstage_res.is_some() {
+        println!("Staged file for removal");
+    } else if let Some(_) = index.additions.remove(repo_file) {
         println!("Removed deleted file from staging area.");
     } else {
-        println!("File already staged for removal.");
+        index.save()?;
+        anyhow::bail!("File already staged for removal.");
     }
     index.save()?;
     return Ok(());
