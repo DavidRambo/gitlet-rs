@@ -31,7 +31,7 @@ fn staged_file_status() -> Result<(), Box<dyn Error>> {
     cmd.current_dir(&tmpdir).arg("init");
     cmd.assert().success();
 
-    let tmp_path = String::from(&format!("{}/tmp.txt", tmpdir.to_str().unwrap()));
+    let tmp_path = String::from(&format!("{}/tmp.txt", tmpdir.display()));
 
     let mut cmd = Command::new("touch");
     cmd.arg(&tmp_path);

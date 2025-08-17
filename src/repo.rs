@@ -84,7 +84,7 @@ pub(crate) fn find_working_tree_dir(filepath: &path::Path) -> Result<PathBuf> {
     let filepath = std::fs::canonicalize(filepath).with_context(|| {
         format!(
             "Creating absolute path for filepath: '{}'",
-            filepath.to_str().unwrap()
+            filepath.display()
         )
     })?;
 

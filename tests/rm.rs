@@ -30,7 +30,7 @@ fn cannot_rm_untracked_file() -> Result<(), Box<dyn Error>> {
 #[test]
 fn cannot_rm_staged_changes_file() -> Result<(), Box<dyn Error>> {
     let tmpdir = assert_fs::TempDir::new()?;
-    let tmp_path = format!("{}/a.txt", tmpdir.to_str().unwrap());
+    let tmp_path = format!("{}/a.txt", tmpdir.display());
 
     let mut cmd = Command::new("touch");
     cmd.current_dir(&tmpdir).arg("a.txt");
@@ -58,7 +58,7 @@ fn cannot_rm_staged_changes_file() -> Result<(), Box<dyn Error>> {
 #[test]
 fn rm_cached() -> Result<(), Box<dyn Error>> {
     let tmpdir = assert_fs::TempDir::new()?;
-    let tmp_path = format!("{}/a.txt", tmpdir.to_str().unwrap());
+    let tmp_path = format!("{}/a.txt", tmpdir.display());
 
     let mut cmd = Command::new("touch");
     cmd.current_dir(&tmpdir).arg("a.txt");
@@ -108,7 +108,7 @@ fn rm_from_working_tree() -> Result<(), Box<dyn Error>> {
     cmd.current_dir(&tmpdir).arg("rm").arg("a.txt");
     cmd.assert().success();
 
-    let tmp_path = format!("{}/a.txt", tmpdir.to_str().unwrap());
+    let tmp_path = format!("{}/a.txt", tmpdir.display());
     assert!(!std::fs::exists(&tmp_path)?);
 
     Ok(())
