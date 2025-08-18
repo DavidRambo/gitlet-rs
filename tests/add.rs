@@ -9,7 +9,7 @@ use predicates::prelude::predicate;
 #[test]
 fn stage_file() -> Result<(), Box<dyn Error>> {
     let tmpdir = assert_fs::TempDir::new()?;
-    let tmp_path = format!("{}/tmp.txt", tmpdir.to_str().unwrap());
+    let tmp_path = format!("{}/tmp.txt", tmpdir.display());
 
     let mut cmd = Command::new("touch");
     cmd.arg(&tmp_path);

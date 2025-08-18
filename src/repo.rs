@@ -468,4 +468,60 @@ mod tests {
             Ok(())
         })
     }
+
+    #[test]
+    fn new_branch_has_empty_head_commit_hash() -> Result<()> {
+        let tmpdir = assert_fs::TempDir::new()?;
+        test_utils::set_dir(&tmpdir, || {
+            fs::create_dir_all(".gitlet/refs")?;
+            fs::create_dir(".gitlet/commit")?;
+
+            let mut head_file = fs::File::create(".gitlet/HEAD")?;
+            head_file.write(b"main")?;
+
+            let mut main_ref = fs::File::create(".gitlet/refs/main")?;
+            main_ref.write(b"")?;
+
+            create_branch("test").context("Create 'test' branch")?;
+
+            // Show that it points to the same hash as main/HEAD
+            let mut test_ref =
+                fs::File::open(".gitlet/refs/test").context("Open 'test' ref file")?;
+            let mut test_hash = String::new();
+            test_ref
+                .read_to_string(&mut test_hash)
+                .context("Read 'test' ref file")?;
+            assert_eq!("", &test_hash);
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn new_branch_has_head_commit_hash() -> Result<()> {
+        let tmpdir = assert_fs::TempDir::new()?;
+        test_utils::set_dir(&tmpdir, || {
+            fs::create_dir_all(".gitlet/refs")?;
+            fs::create_dir(".gitlet/commit")?;
+
+            let mut head_file = fs::File::create(".gitlet/HEAD")?;
+            head_file.write(b"main")?;
+
+            let mut main_ref = fs::File::create(".gitlet/refs/main")?;
+            main_ref.write(b"0452ef28c90d315dc3e05323c18b2e3724f7b275")?;
+
+            create_branch("test").context("Create 'test' branch")?;
+
+            // Show that it points to the same hash as main/HEAD
+            let mut test_ref =
+                fs::File::open(".gitlet/refs/test").context("Open 'test' ref file")?;
+            let mut test_hash = String::new();
+            test_ref
+                .read_to_string(&mut test_hash)
+                .context("Read 'test' ref file")?;
+            assert_eq!("0452ef28c90d315dc3e05323c18b2e3724f7b275", &test_hash);
+
+            Ok(())
+        })
+    }
 }
