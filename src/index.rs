@@ -110,6 +110,7 @@ pub(crate) fn clear_index() -> Result<()> {
     Ok(())
 }
 
+/// Displays the files staged for addition and for removal.
 pub fn status(mut writer: impl std::io::Write) -> Result<()> {
     let index = Index::load()?;
     write!(writer, "{index}").expect("Failed to write Index");

@@ -51,8 +51,10 @@ pub fn status() -> Result<()> {
     let handle = stdout.lock();
     let mut buf_handle = io::BufWriter::new(handle);
 
-    // TODO: Current branch.
+    let branch_name = read_head_branch()?;
+    writeln!(buf_handle, "On branch {branch_name}\n")?;
 
+    // Staged for addition and for removal
     index::status(&mut buf_handle)?;
 
     writeln!(buf_handle, "\n=== Unstaged Modifications ===")?;
@@ -170,6 +172,18 @@ fn update_head(hash: &str) -> Result<()> {
     Ok(())
 }
 
+/// Get the name of the branch in HEAD
+fn read_head_branch() -> Result<String> {
+    let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root")?;
+    let mut head = std::fs::File::open(repo_root.join(".gitlet/HEAD")).context("Open HEAD file")?;
+
+    let mut branch_name = String::new();
+    head.read_to_string(&mut branch_name)
+        .context("Read branch name from HEAD")?;
+
+    Ok(branch_name)
+}
+
 /// Returns true if the given file is tracked.
 ///
 /// A file is tracked if it is represented either by the HEAD commit or by the index.
@@ -186,6 +200,7 @@ fn read_head_hash() -> Result<String> {
 
     let branch_name = std::fs::read_to_string(repo_root.join(".gitlet/HEAD"))
         .context("Read branch name from HEAD")?;
+
     let branch_ref = std::fs::read_to_string(repo_root.join(".gitlet/refs").join(branch_name))
         .context("Read current HEAD commit")?;
 
