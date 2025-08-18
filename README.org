@@ -33,8 +33,8 @@
   - [X] retrieve tracked files
   - [X] retrieve untracked files
   - [X] status: staged file with later changes
-  - [ ] initialize a main branch
-  - [ ] refactor HEAD to point to checked out branch file, which contains its head commit
+  - [X] initialize a main branch
+  - [X] refactor HEAD to point to checked out branch file, which contains its head commit
   - [ ] status: current branch
   - [ ] branch
   - [ ] checkout

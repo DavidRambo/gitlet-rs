@@ -31,11 +31,14 @@ pub fn init(repo_dir: Option<String>) -> Result<()> {
         fs::create_dir(rpath).expect("Failed to create directory for repository");
     }
 
-    fs::create_dir(rpath.join(".gitlet"))?;
-    fs::create_dir(rpath.join(".gitlet/blobs"))?;
-    fs::create_dir(rpath.join(".gitlet/commits"))?;
-    fs::create_dir(rpath.join(".gitlet/refs"))?;
-    fs::File::create(rpath.join(".gitlet/HEAD"))?;
+    fs::create_dir(rpath.join(".gitlet")).context("Create '.gitlet/'")?;
+    fs::create_dir(rpath.join(".gitlet/blobs")).context("Create '.gitlet/blobs/'")?;
+    fs::create_dir(rpath.join(".gitlet/commits")).context("Create '.gitlet/commits/'")?;
+    fs::create_dir(rpath.join(".gitlet/refs")).context("Create '.gitlet/refs/'")?;
+    fs::File::create(rpath.join(".gitlet/refs/main")).context("Create '.gitlet/refs/main'")?;
+    let mut head = fs::File::create(rpath.join(".gitlet/HEAD")).context("Create '.gitlet/HEAD'")?;
+    head.write_all(b"main")
+        .context("Write 'main' to '.gitlet/HEAD'")?;
 
     println!("Initialized empty Gitlet repository");
 
@@ -138,16 +141,8 @@ pub fn commit(message: String) -> Result<()> {
     }
 
     // Get the parent commit hash.
-    let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root")?;
-    let mut head = std::fs::File::open(repo_root.join(".gitlet/HEAD")).context("Open HEAD file")?;
-    let mut parent_hash = String::with_capacity(40);
-    let Ok(n) = head.read_to_string(&mut parent_hash) else {
-        anyhow::bail!("Problem with HEAD file");
-    };
-    // n == 0 => this is the first commit (HEAD is empty)
-    if n != 0 && n != 40 {
-        anyhow::bail!("Problem with HEAD file");
-    }
+    let parent_hash =
+        read_head_hash().context("Retrieve current commit hash for parent of new commit")?;
 
     let new_commit = Commit::new(parent_hash, None, message, index).context("Create commit")?;
     update_head(&new_commit.hash)?;
@@ -161,9 +156,16 @@ pub fn commit(message: String) -> Result<()> {
 /// Helper function to update HEAD file
 fn update_head(hash: &str) -> Result<()> {
     let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root")?;
-    let mut head =
-        std::fs::File::create(repo_root.join(".gitlet/HEAD")).context("Open HEAD file")?;
-    head.write_all(hash.as_bytes())
+    let mut head = std::fs::File::open(repo_root.join(".gitlet/HEAD")).context("Open HEAD file")?;
+
+    let mut branch_name = String::new();
+    head.read_to_string(&mut branch_name)
+        .context("Read branch name from HEAD")?;
+
+    let mut branch_ref = std::fs::File::create(repo_root.join(".gitlet/refs").join(branch_name))
+        .context("Truncate branch ref file")?;
+    branch_ref
+        .write_all(hash.as_bytes())
         .context("Write hash to HEAD")?;
     Ok(())
 }
@@ -182,11 +184,16 @@ pub(crate) fn is_tracked_by_head(filepath: &Path) -> bool {
 fn read_head_hash() -> Result<String> {
     let repo_root = abs_path_to_repo_root()?;
 
-    let buf = std::fs::read(repo_root.join(".gitlet/HEAD"))?;
+    let branch_name = std::fs::read_to_string(repo_root.join(".gitlet/HEAD"))
+        .context("Read branch name from HEAD")?;
+    let branch_ref = std::fs::read_to_string(repo_root.join(".gitlet/refs").join(branch_name))
+        .context("Read current HEAD commit")?;
 
-    let hash = String::from_utf8(buf)?;
+    if branch_ref.len() != 0 && branch_ref.len() != 40 {
+        anyhow::bail!("Invalid commit");
+    }
 
-    Ok(hash)
+    Ok(branch_ref)
 }
 
 /// Returns the commit referenced by the HEAD file's hash.
@@ -384,7 +391,12 @@ mod tests {
             });
             serde_json::to_writer(&mut f, &json).context("Write commit json")?;
 
-            let _f = fs::File::create(".gitlet/HEAD").context("Create HEAD file")?;
+            let mut head_file = fs::File::create(".gitlet/HEAD").context("Create HEAD file")?;
+            head_file.write(b"main")?;
+
+            fs::create_dir(".gitlet/refs").context("Create refs directory")?;
+            fs::File::create(".gitlet/refs/main").context("Create main branch ref file")?;
+
             update_head("9f58103e11b63e5ccca06154ab8838be7639a574")?;
 
             assert!(is_tracked_by_head(Path::new("b.txt")));

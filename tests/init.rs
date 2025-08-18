@@ -3,7 +3,7 @@ use assert_cmd::prelude::*; // Add methods on commands
 use assert_fs::prelude::*;
 // Add methods on commands
 use predicates::prelude::*; // For writing assertions
-use std::{error::Error, process::Command}; // Run programs
+use std::{error::Error, fs, process::Command}; // Run programs
 
 #[test]
 fn init_new_repo_in_cd() -> Result<(), Box<dyn Error>> {
@@ -27,8 +27,14 @@ fn init_new_repo_in_cd() -> Result<(), Box<dyn Error>> {
         .child(".gitlet/refs")
         .assert(predicate::path::is_dir());
     tmpdir
+        .child(".gitlet/refs/main")
+        .assert(predicate::path::is_file());
+    tmpdir
         .child(".gitlet/HEAD")
         .assert(predicate::path::exists());
+    let head = fs::File::open(&tmpdir.join(".gitlet/HEAD"))?;
+    let actual = std::io::read_to_string(head)?;
+    assert_eq!(String::from("main"), actual);
 
     Ok(())
 }
@@ -54,8 +60,15 @@ fn init_new_repo_in_path() -> Result<(), Box<dyn Error>> {
         .child(".gitlet/refs")
         .assert(predicate::path::is_dir());
     tmpdir
+        .child(".gitlet/refs/main")
+        .assert(predicate::path::is_file());
+    tmpdir
         .child(".gitlet/HEAD")
         .assert(predicate::path::exists());
+
+    let head = fs::File::open(&tmpdir.join(".gitlet/HEAD"))?;
+    let actual = std::io::read_to_string(head)?;
+    assert_eq!(String::from("main"), actual);
 
     Ok(())
 }
@@ -89,8 +102,16 @@ fn create_new_repo_dir_and_init() -> Result<(), Box<dyn Error>> {
         .assert(predicate::path::is_dir());
     tmpdir
         .child("new_tmp")
+        .child(".gitlet/refs/main")
+        .assert(predicate::path::is_file());
+    tmpdir
+        .child("new_tmp")
         .child(".gitlet/HEAD")
         .assert(predicate::path::exists());
+
+    let head = fs::File::open(&tmpdir.child("new_tmp/.gitlet/HEAD"))?;
+    let actual = std::io::read_to_string(head)?;
+    assert_eq!(String::from("main"), actual);
 
     Ok(())
 }
