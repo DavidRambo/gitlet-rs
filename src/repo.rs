@@ -51,7 +51,7 @@ pub fn status() -> Result<()> {
     let handle = stdout.lock();
     let mut buf_handle = io::BufWriter::new(handle);
 
-    let branch_name = read_head_branch()?;
+    let branch_name = get_head_branch()?;
     writeln!(buf_handle, "On branch {branch_name}\n")?;
 
     // Staged for addition and for removal
@@ -71,6 +71,102 @@ pub fn status() -> Result<()> {
     writeln!(buf_handle)?;
 
     buf_handle.flush()?;
+
+    Ok(())
+}
+
+/// Displays a list of branches, marking the one currently checked out with an asterisk.
+pub fn branch(branch_name: Option<String>, delete: bool) -> Result<()> {
+    if delete {
+        if let Some(branch_name) = branch_name {
+            return delete_branch(&branch_name);
+        } else {
+            anyhow::bail!("Branch name required");
+        }
+    } else if let Some(branch_name) = branch_name {
+        return create_branch(&branch_name);
+    }
+
+    let repo_root = abs_path_to_repo_root().context("Get absolute path to repo directory")?;
+    let head_branch: std::ffi::OsString = get_head_branch()
+        .context("Get name of currently checked out branch")?
+        .into();
+
+    let mut branches: Vec<_> = repo_root
+        .join(".gitlet/refs")
+        .read_dir()
+        .context("Read refs directory")?
+        .filter_map(Result::ok) // To skip Err entries
+        .filter(|e| e.file_type().is_ok_and(|f| f.is_file())) // Keep only files
+        .collect();
+
+    branches.sort_by_key(|e| e.file_name());
+
+    for entry in branches {
+        let branch_name = entry.file_name();
+        if head_branch == branch_name {
+            println!("* {}", branch_name.display());
+        } else {
+            println!("  {}", branch_name.display());
+        }
+    }
+
+    Ok(())
+}
+
+fn create_branch(branch_name: &str) -> std::result::Result<(), anyhow::Error> {
+    // Create the path to the named branch.
+    let branch_path = abs_path_to_repo_root()
+        .context("Get absolute path to working tree root")?
+        .join(".gitlet/refs")
+        .join(&branch_name);
+
+    if branch_path.exists() {
+        anyhow::bail!("A branch named '{branch_name}' already exists");
+    }
+
+    let head_hash = read_head_hash().context("Get HEAD commit hash")?;
+
+    let mut f = fs::File::create_new(branch_path)
+        .with_context(|| format!("A branch named '{branch_name}' already exists"))?;
+
+    f.write_all(head_hash.as_bytes())
+        .context("Write HEAD hash to new branch ref")?;
+
+    Ok(())
+}
+
+/// Deletes the named branch.
+///
+/// # Panics
+/// Panics if the named branch is currently checked out or does not exist.
+fn delete_branch(branch_name: &str) -> Result<()> {
+    let current_branch = get_head_branch().context("Get current branch name")?;
+    if branch_name == current_branch {
+        anyhow::bail!("Cannot delete branch when it is checked out");
+    }
+
+    // Create the path to the named branch.
+    let branch_path = abs_path_to_repo_root()
+        .context("Get absolute path to working tree root")?
+        .join(".gitlet/refs")
+        .join(&branch_name);
+
+    if !branch_path.exists() {
+        anyhow::bail!(
+            "Branch '{}' not found",
+            branch_path.file_name().unwrap().display()
+        );
+    }
+
+    fs::remove_file(&branch_path).with_context(|| {
+        format!(
+            "Delete branch '{}'",
+            branch_path.file_name().unwrap().display()
+        )
+    })?;
+
+    println!("Deleted branch '{branch_name}'");
 
     Ok(())
 }
@@ -173,7 +269,7 @@ fn update_head(hash: &str) -> Result<()> {
 }
 
 /// Get the name of the branch in HEAD
-fn read_head_branch() -> Result<String> {
+fn get_head_branch() -> Result<String> {
     let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root")?;
     let mut head = std::fs::File::open(repo_root.join(".gitlet/HEAD")).context("Open HEAD file")?;
 

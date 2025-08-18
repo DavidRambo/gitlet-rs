@@ -8,6 +8,7 @@
    - This implementation also supports calling gitlet commands from anywhere within the working tree, not only at the root.
    - Gitlet uses a single command, `remove`, to handle unstaging staged files and deleting them from the repo. This implementation adheres more closely to Git in that it provides a `rm` command with a `--cached` option.
    - Gitlet lists all branches with its `status` command, including an asterisk next to the current branch. This implementation only shows the current branch with `status` and shows all branches with the `branch` command.
+   - Gitlet uses `checkout`. This implementation uses `switch` and `switch -c`.
 
 ** Related projects
    After doing it in Java, I implemented it in Python as [Gitlepy](https://github.com/DavidRambo/gitlepy).
@@ -36,9 +37,11 @@
   - [X] initialize a main branch
   - [X] refactor HEAD to point to checked out branch file, which contains its head commit
   - [X] status: current branch
-  - [ ] branch
-  - [ ] checkout
-  - [ ] switch [-c]
+  - [X] branch command: list branch names with asterisk by currently checked out
+  - [X] branch <branch_name>: create a new branch
+  - [X] branch -D: only support forced deletion (for now at least)
+  - [ ] switch <branch_name>
+  - [ ] switch [-c]: create a new branch and switch to it
   - [ ] support for detached HEAD (i.e. directly checkout a commit and not a branch)
   - [ ] merge
   - [ ] add headers to gitlet objects (as in git)

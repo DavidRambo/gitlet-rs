@@ -42,6 +42,13 @@ enum Commands {
 
     /// Prints a log of the commit history starting from the HEAD.
     Log,
+
+    /// Prints a list of branches, marking the current with an asterisk.
+    Branch {
+        #[arg(short = 'D')]
+        delete: bool,
+        branch_name: Option<String>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -55,6 +62,10 @@ fn main() -> Result<()> {
         Commands::Status => repo::status()?,
         Commands::Commit { message } => repo::commit(message)?,
         Commands::Log => repo::log()?,
+        Commands::Branch {
+            branch_name,
+            delete,
+        } => repo::branch(branch_name, delete)?,
     }
 
     Ok(())
