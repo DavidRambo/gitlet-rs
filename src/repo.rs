@@ -1,5 +1,6 @@
 //! This module provides methods for creating a new repository and for interacting with an existing one.
 
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{self, Path, PathBuf};
@@ -7,6 +8,7 @@ use std::path::{self, Path, PathBuf};
 use anyhow::{Context, Result, anyhow};
 use walkdir::WalkDir;
 
+use crate::blob::Blob;
 use crate::commit::{Commit, get_commit_blobs};
 use crate::index::{self, Index};
 
@@ -139,6 +141,7 @@ fn create_branch(branch_name: &str) -> std::result::Result<(), anyhow::Error> {
 /// Deletes the named branch.
 ///
 /// # Panics
+///
 /// Panics if the named branch is currently checked out or does not exist.
 fn delete_branch(branch_name: &str) -> Result<()> {
     let current_branch = get_head_branch().context("Get current branch name")?;
@@ -171,6 +174,182 @@ fn delete_branch(branch_name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Switches to the named branch if it exists. If it does not exist and `create` is set, then it
+/// creates the branch and switches to it.
+///
+/// # Panics
+///
+/// Returns an error if the named branch does not exist and `create` is not set, or vice versa.
+pub fn switch(branch_name: &str, create: bool) -> Result<()> {
+    // Is it already checked out?
+    let current_branch = get_head_branch().context("Get current branch name")?;
+    if branch_name == current_branch {
+        println!("Already on '{branch_name}'");
+        return Ok(());
+    }
+
+    // Create the path to the named branch.
+    let branch_path = abs_path_to_repo_root()
+        .context("Get absolute path to working tree root")?
+        .join(".gitlet/refs")
+        .join(&branch_name);
+
+    // Does the branch exist?
+    if branch_path.exists() {
+        return checkout_branch(branch_name);
+    }
+
+    // No?
+    // Is create true?
+    if create {
+        // Yes: Create it and checkout.
+        create_branch(branch_name)?;
+        return checkout_branch(branch_name);
+    }
+
+    // No: Bail!
+    anyhow::bail!("invalid reference: '{branch_name}'")
+}
+
+/// Checks out the head commit of the named branch.
+fn checkout_branch(branch_name: &str) -> Result<()> {
+    let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root")?;
+
+    let branch_ref = std::fs::read_to_string(repo_root.join(".gitlet/refs").join(branch_name))
+        .context("Read current HEAD commit")?;
+    if branch_ref.len() != 0 && branch_ref.len() != 40 {
+        anyhow::bail!("Invalid commit");
+    }
+
+    checkout_commit(&branch_ref)?;
+
+    let mut head_file =
+        std::fs::File::create(repo_root.join(".gitlet/HEAD")).context("Open HEAD file")?;
+    head_file
+        .write_all(branch_name.as_bytes())
+        .context("Write branch name to HEAD file")?;
+
+    println!("Switched to branch '{branch_name}'");
+
+    Ok(())
+}
+
+/// Checks out the given commit.
+///
+/// # Panics
+///
+/// Panics when there is a modified tracked file that differs (or does not exist) in the destination
+/// commit.
+fn checkout_commit(hash: &str) -> Result<()> {
+    let src_commit_hash = &read_head_hash().context("Get hash of current HEAD commit")?;
+
+    let src_tracked_files = get_commit_blobs(src_commit_hash)
+        .context("Get collection of current HEAD's tracked files")?;
+    let dst_tracked_files =
+        get_commit_blobs(hash).context("Get collection of current HEAD's tracked files")?;
+
+    // For modified tracked files, bail if the file is tracked by the destination commit
+    // but it differs.
+    let mut modified_tracked_files: Vec<PathBuf> = Vec::new();
+    let mut conflicts: Vec<PathBuf> = Vec::new();
+
+    for filepath in unstaged_modifications().context("Collect paths of unstaged modified files")? {
+        // In case it is a deleted file, split it at ' (deleted)' and return the file name.
+        let filepath = PathBuf::from(filepath.split_whitespace().next().unwrap());
+
+        if file_differs_between_commits(&filepath, &src_tracked_files, &dst_tracked_files)
+            .context("Compare tracked versions of file")?
+        {
+            conflicts.push(filepath);
+        } else {
+            modified_tracked_files.push(filepath);
+        }
+    }
+
+    let index = Index::load().context("Load the staging area")?;
+    // Check files staged for addition.
+    for filepath in index.additions.keys() {
+        if file_differs_between_commits(&filepath, &src_tracked_files, &dst_tracked_files)
+            .context("Compare tracked versions of file")?
+        {
+            conflicts.push(filepath.clone());
+        } else {
+            modified_tracked_files.push(filepath.clone());
+        }
+    }
+
+    // Check files staged for removal.
+    for filepath in index.removals.iter() {
+        if file_differs_between_commits(&filepath, &src_tracked_files, &dst_tracked_files)
+            .context("Compare tracked versions of file")?
+        {
+            conflicts.push(filepath.clone());
+        } else {
+            modified_tracked_files.push(filepath.clone());
+        }
+    }
+
+    // Report files that would be overwritten and then bail.
+    if !conflicts.is_empty() {
+        eprintln!("Your local changes to the following files would be overwritten by checkout:");
+        for f in conflicts {
+            eprintln!("\t {}", f.display());
+        }
+        anyhow::bail!("")
+    }
+
+    // Save current working directory.
+    let initial_dir = std::env::current_dir().context("Get current working directory")?;
+    // Change to root of the repository.
+    std::env::set_current_dir(abs_path_to_repo_root().context("Get repository root directory")?)
+        .context("Set current working directory to the root of the repository")?;
+
+    // Delete files tracked by current commit and untracked by target commit.
+    for filepath in src_tracked_files.keys() {
+        if !modified_tracked_files.contains(filepath) && !dst_tracked_files.contains_key(filepath) {
+            fs::remove_file(filepath)
+                .with_context(|| format!("Delete file '{}'", filepath.display()))?;
+        }
+    }
+
+    // Load file contents from destination commit's blobs, skipping those with staged or
+    // unstaged modifications.
+    for (filepath, blob) in dst_tracked_files.iter() {
+        if !modified_tracked_files.contains(filepath) {
+            println!("File '{}' not a modified tracked file", filepath.display());
+            // No need to restore file if it is the same.
+            if let Some(src_blob) = src_tracked_files.get(filepath) {
+                println!("It is tracked by the current branch. Comparing to destination branch...");
+                if src_blob.hash == blob.hash {
+                    println!("They match. Skipping...");
+                    continue;
+                }
+            }
+            println!("Restoring file to destination branch's version...");
+            blob.restore(filepath)?;
+        }
+    }
+
+    // Revert to initial working directory.
+    std::env::set_current_dir(initial_dir).context("Reset working directory to where it was")?;
+
+    Ok(())
+}
+
+fn file_differs_between_commits(
+    filepath: &Path,
+    src_tracked_files: &HashMap<PathBuf, Blob>,
+    dst_tracked_files: &HashMap<PathBuf, Blob>,
+) -> Result<bool> {
+    match (
+        src_tracked_files.get(filepath),
+        dst_tracked_files.get(filepath),
+    ) {
+        (Some(src), Some(dst)) => Ok(src.hash != dst.hash),
+        (_, _) => Ok(false),
+    }
+}
+
 /// Returns the given filepath relative to the root directory of the working tree.
 ///
 /// For example, given a path `/var/tmp/work/sub/t.rs`, and assuming `/var/tmp/work/.gitlet`, the
@@ -181,7 +360,7 @@ fn delete_branch(branch_name: &str) -> Result<()> {
 ///
 /// This is useful for nested directory structures as well as for stripping arbitrary parent paths,
 /// such as with absolute paths.
-pub(crate) fn find_working_tree_dir(filepath: &path::Path) -> Result<PathBuf> {
+pub(crate) fn find_working_tree_dir(filepath: &Path) -> Result<PathBuf> {
     let filepath = std::fs::canonicalize(filepath).with_context(|| {
         format!(
             "Creating absolute path for filepath: '{}'",
@@ -224,7 +403,7 @@ pub(crate) fn abs_path_to_repo_root() -> Result<PathBuf> {
 }
 
 /// Returns the absolute path of the file in the working tree.
-fn abs_path_working_file(fp: &path::Path) -> Result<path::PathBuf> {
+fn abs_path_working_file(fp: &Path) -> Result<path::PathBuf> {
     let mut repo_root = abs_path_to_repo_root()?;
     repo_root.push(fp);
     Ok(repo_root)

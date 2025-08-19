@@ -2,7 +2,7 @@
 //! .gitlet/blobs directory.
 use std::{
     fs,
-    io::{self, BufReader, prelude::*},
+    io::{self, BufRead, BufWriter, Write},
     path,
 };
 
@@ -42,20 +42,6 @@ impl Blob {
         let hash = hex::encode(hash);
 
         Ok(Self { hash })
-    }
-
-    /// Constructs a Blob from an existent blob object's id.
-    pub fn retrieve(hash: &str) -> Result<Self> {
-        let blobpath = repo::abs_path_to_repo_root()?
-            .join(".gitlet/blobs")
-            .join(&hash[..2])
-            .join(&hash[2..]);
-
-        anyhow::ensure!(blobpath.exists(), "The provided blob object does not exist");
-
-        Ok(Blob {
-            hash: hash.to_string(),
-        })
     }
 
     /// Writes the blob object file using Zlib compression on the file.
@@ -100,12 +86,17 @@ impl Blob {
         let mut blobfile =
             fs::File::open(blobpath).context("Open blob object file for decompression")?;
 
-        let f = fs::File::create(fpath)
-            .context("Create file in working tree for streaming blob object")?;
-        let decoder = ZlibDecoder::new(f);
-        let mut decoder = BufReader::new(decoder);
+        let f = fs::File::create(fpath).with_context(|| {
+            format!(
+                "Create file '{}' in working tree for streaming blob object",
+                fpath.display()
+            )
+        })?;
 
-        std::io::copy(&mut decoder, &mut blobfile)
+        let decoder = ZlibDecoder::new(f);
+        let mut decoder = BufWriter::new(decoder);
+
+        std::io::copy(&mut blobfile, &mut decoder)
             .context("Decompress blob object into working tree file")?;
 
         Ok(())
@@ -128,6 +119,22 @@ mod tests {
     use std::path::Path;
 
     use crate::test_utils;
+
+    impl Blob {
+        /// Constructs a Blob from an existent blob object's id.
+        fn retrieve(hash: &str) -> Result<Self> {
+            let blobpath = repo::abs_path_to_repo_root()?
+                .join(".gitlet/blobs")
+                .join(&hash[..2])
+                .join(&hash[2..]);
+
+            anyhow::ensure!(blobpath.exists(), "The provided blob object does not exist");
+
+            Ok(Blob {
+                hash: hash.to_string(),
+            })
+        }
+    }
 
     #[test]
     fn no_file_to_blob() {

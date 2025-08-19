@@ -49,6 +49,13 @@ enum Commands {
         delete: bool,
         branch_name: Option<String>,
     },
+
+    /// Switches branches, optionally creating the named one.
+    Switch {
+        branch_name: String,
+        #[arg(short, long)]
+        create: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -66,6 +73,10 @@ fn main() -> Result<()> {
             branch_name,
             delete,
         } => repo::branch(branch_name, delete)?,
+        Commands::Switch {
+            branch_name,
+            create,
+        } => repo::switch(&branch_name, create)?,
     }
 
     Ok(())

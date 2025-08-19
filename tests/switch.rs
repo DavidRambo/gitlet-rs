@@ -1,6 +1,7 @@
 //! Tests the switch commands
 
 use std::error::Error;
+use std::io::Read;
 use std::process::Command;
 
 use assert_cmd::prelude::*;
@@ -53,6 +54,12 @@ fn create_and_switch_to_new_branch() -> Result<(), Box<dyn Error>> {
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("branch").arg("test_branch");
     cmd.assert().success();
+
+    let head = tmpdir.join(".gitlet/HEAD");
+    let mut head = std::fs::File::open(head)?;
+    let mut head_contents = String::new();
+    head.read_to_string(&mut head_contents)?;
+    assert_eq!("main", &head_contents);
 
     // Switch to 'test_branch'
     let mut cmd = Command::cargo_bin("gitlet")?;
