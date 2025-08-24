@@ -1,7 +1,7 @@
 //! This module provides methods for creating a new repository and for interacting with an existing one.
 
 use std::collections::HashMap;
-use std::fs;
+use std::fs::{self, read_dir};
 use std::io::{self, Read, Write};
 use std::path::{self, Path, PathBuf};
 
@@ -116,7 +116,7 @@ pub fn branch(branch_name: Option<String>, delete: bool) -> Result<()> {
     Ok(())
 }
 
-fn create_branch(branch_name: &str) -> std::result::Result<(), anyhow::Error> {
+fn create_branch(branch_name: &str) -> Result<()> {
     // Create the path to the named branch.
     let branch_path = abs_path_to_repo_root()
         .context("Get absolute path to working tree root")?
@@ -203,7 +203,7 @@ pub fn switch(branch_name: &str, create: bool) -> Result<()> {
     // Is create true?
     if create {
         // Yes: Create it and checkout.
-        create_branch(branch_name)?;
+        create_branch(branch_name).with_context(|| format!("Create branch '{branch_name}'"))?;
         return checkout_branch(branch_name);
     }
 
@@ -221,7 +221,7 @@ fn checkout_branch(branch_name: &str) -> Result<()> {
         anyhow::bail!("Invalid commit");
     }
 
-    checkout_commit(&branch_ref)?;
+    checkout_commit(&branch_ref).with_context(|| format!("Checkout commit {branch_ref}"))?;
 
     let mut head_file =
         std::fs::File::create(repo_root.join(".gitlet/HEAD")).context("Open HEAD file")?;
@@ -309,6 +309,35 @@ fn checkout_commit(hash: &str) -> Result<()> {
         if !modified_tracked_files.contains(filepath) && !dst_tracked_files.contains_key(filepath) {
             fs::remove_file(filepath)
                 .with_context(|| format!("Delete file '{}'", filepath.display()))?;
+
+            // Subdirectories left empty need to be removed, too, but only those that become
+            // empty, since otherwise untracked empty trees would be deleted, too, which we don't
+            // want. Need as well to walk up the directory tree until finding a non-empty tree.
+            // However, as in Git, when a command is issued while in a subtree that only exists in
+            // the commit being switched from, the subtree is kept.
+            let dirpath = filepath;
+            while let Some(dirpath) = dirpath.parent() {
+                // Ensure not at repo root, which is an empty path.
+                if read_dir(dirpath)
+                    .map(|mut e| e.next().is_none())
+                    .unwrap_or(false)
+                {
+                    // Do not delete if it was the directory from which the command was issued.
+                    // For example, initial_dir may be '/var/tmp/repo/sub', and the filepath may be
+                    // 'sub/a.xt', which leaves a dirpath of 'sub' ('repo/' being the root dir).
+                    let abs_dirpath = fs::canonicalize(dirpath).with_context(|| {
+                        format!("Create absolute path for '{}'", dirpath.display())
+                    })?;
+                    if initial_dir == abs_dirpath {
+                        break;
+                    }
+
+                    fs::remove_dir(dirpath)
+                        .with_context(|| format!("Remove dir '{}'", dirpath.display()))?;
+                } else {
+                    break;
+                }
+            }
         }
     }
 
@@ -327,7 +356,7 @@ fn checkout_commit(hash: &str) -> Result<()> {
     }
 
     // Revert to initial working directory.
-    std::env::set_current_dir(initial_dir).context("Reset working directory to where it was")?;
+    std::env::set_current_dir(&initial_dir).context("Reset working directory to where it was")?;
 
     Ok(())
 }
