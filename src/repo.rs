@@ -316,16 +316,12 @@ fn checkout_commit(hash: &str) -> Result<()> {
     // unstaged modifications.
     for (filepath, blob) in dst_tracked_files.iter() {
         if !modified_tracked_files.contains(filepath) {
-            println!("File '{}' not a modified tracked file", filepath.display());
             // No need to restore file if it is the same.
             if let Some(src_blob) = src_tracked_files.get(filepath) {
-                println!("It is tracked by the current branch. Comparing to destination branch...");
                 if src_blob.hash == blob.hash {
-                    println!("They match. Skipping...");
                     continue;
                 }
             }
-            println!("Restoring file to destination branch's version...");
             blob.restore(filepath)?;
         }
     }

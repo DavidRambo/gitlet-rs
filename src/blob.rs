@@ -86,6 +86,12 @@ impl Blob {
         let mut blobfile =
             fs::File::open(blobpath).context("Open blob object file for decompression")?;
 
+        // Create any missing directories before creating the file.
+        if let Some(parent_dirs) = fpath.parent() {
+            fs::create_dir_all(parent_dirs).with_context(|| {
+                format!("Create directories for dirpath '{}'", parent_dirs.display())
+            })?;
+        }
         let f = fs::File::create(fpath).with_context(|| {
             format!(
                 "Create file '{}' in working tree for streaming blob object",

@@ -45,6 +45,7 @@
   - [X] checkout commit
   - [X] switch <branch_name>
   - [X] switch [-c]: create a new branch and switch to it
+  - [X] FIX: Blob.restore() must create missing directories
   - [ ] support for detached HEAD (i.e. directly checkout a commit and not a branch)
   - [ ] merge
   - [ ] add headers to gitlet objects (as in git)
