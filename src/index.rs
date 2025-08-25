@@ -153,7 +153,7 @@ pub fn rm(cached: bool, file_name: &str) -> Result<()> {
     }
 
     let fpath_from_root =
-        repo::find_working_tree_dir(&f).context("Create filepath from repo root")?;
+        repo::find_working_tree_dir(f).context("Create filepath from repo root")?;
 
     let mut index = Index::load().context("Load index")?;
 
@@ -200,7 +200,7 @@ pub fn rm(cached: bool, file_name: &str) -> Result<()> {
 
 /// Updates the staging area, if necessary, to reflect the removal of a deleted file.
 fn rm_deleted(f: &path::Path) -> Result<()> {
-    let abs_fp = path::absolute(&f).context("Create absolute path to file name")?;
+    let abs_fp = path::absolute(f).context("Create absolute path to file name")?;
     let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root dir")?;
     let repo_file = abs_fp
         .strip_prefix(&repo_root)
@@ -218,14 +218,15 @@ fn rm_deleted(f: &path::Path) -> Result<()> {
     if !index.removals.contains(repo_file) && repo::is_tracked_by_head(repo_file) {
         index.removals.insert(repo_file.to_path_buf());
         println!("Staged file for removal");
-    } else if let Some(_) = index.additions.remove(repo_file) {
+    } else if index.additions.remove(repo_file).is_some() {
         println!("Removed deleted file from staging area.");
     } else {
         index.save()?;
         anyhow::bail!("File already staged for removal.");
     }
     index.save()?;
-    return Ok(());
+
+    Ok(())
 }
 
 #[cfg(test)]

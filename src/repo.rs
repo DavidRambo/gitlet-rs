@@ -121,7 +121,7 @@ fn create_branch(branch_name: &str) -> Result<()> {
     let branch_path = abs_path_to_repo_root()
         .context("Get absolute path to working tree root")?
         .join(".gitlet/refs")
-        .join(&branch_name);
+        .join(branch_name);
 
     if branch_path.exists() {
         anyhow::bail!("A branch named '{branch_name}' already exists");
@@ -153,7 +153,7 @@ fn delete_branch(branch_name: &str) -> Result<()> {
     let branch_path = abs_path_to_repo_root()
         .context("Get absolute path to working tree root")?
         .join(".gitlet/refs")
-        .join(&branch_name);
+        .join(branch_name);
 
     if !branch_path.exists() {
         anyhow::bail!(
@@ -192,7 +192,7 @@ pub fn switch(branch_name: &str, create: bool) -> Result<()> {
     let branch_path = abs_path_to_repo_root()
         .context("Get absolute path to working tree root")?
         .join(".gitlet/refs")
-        .join(&branch_name);
+        .join(branch_name);
 
     // Does the branch exist?
     if branch_path.exists() {
@@ -217,7 +217,7 @@ fn checkout_branch(branch_name: &str) -> Result<()> {
 
     let branch_ref = std::fs::read_to_string(repo_root.join(".gitlet/refs").join(branch_name))
         .context("Read current HEAD commit")?;
-    if branch_ref.len() != 0 && branch_ref.len() != 40 {
+    if !branch_ref.is_empty() && branch_ref.len() != 40 {
         anyhow::bail!("Invalid commit");
     }
 
@@ -269,7 +269,7 @@ fn checkout_commit(hash: &str) -> Result<()> {
     let index = Index::load().context("Load the staging area")?;
     // Check files staged for addition.
     for filepath in index.additions.keys() {
-        if file_differs_between_commits(&filepath, &src_tracked_files, &dst_tracked_files)
+        if file_differs_between_commits(filepath, &src_tracked_files, &dst_tracked_files)
             .context("Compare tracked versions of file")?
         {
             conflicts.push(filepath.clone());
@@ -280,7 +280,7 @@ fn checkout_commit(hash: &str) -> Result<()> {
 
     // Check files staged for removal.
     for filepath in index.removals.iter() {
-        if file_differs_between_commits(&filepath, &src_tracked_files, &dst_tracked_files)
+        if file_differs_between_commits(filepath, &src_tracked_files, &dst_tracked_files)
             .context("Compare tracked versions of file")?
         {
             conflicts.push(filepath.clone());
@@ -346,10 +346,10 @@ fn checkout_commit(hash: &str) -> Result<()> {
     for (filepath, blob) in dst_tracked_files.iter() {
         if !modified_tracked_files.contains(filepath) {
             // No need to restore file if it is the same.
-            if let Some(src_blob) = src_tracked_files.get(filepath) {
-                if src_blob.hash == blob.hash {
-                    continue;
-                }
+            if let Some(src_blob) = src_tracked_files.get(filepath)
+                && src_blob.hash == blob.hash
+            {
+                continue;
             }
             blob.restore(filepath)?;
         }
@@ -504,7 +504,7 @@ fn read_head_hash() -> Result<String> {
     let branch_ref = std::fs::read_to_string(repo_root.join(".gitlet/refs").join(branch_name))
         .context("Read current HEAD commit")?;
 
-    if branch_ref.len() != 0 && branch_ref.len() != 40 {
+    if !branch_ref.is_empty() && branch_ref.len() != 40 {
         anyhow::bail!("Invalid commit");
     }
 
