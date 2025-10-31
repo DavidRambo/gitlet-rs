@@ -13,7 +13,7 @@
    - Gitlet requires a clear staging area before checking out a different branch. This implementation allows for non-conflicting modifications. (For example, if changes have been made to a file that both the source and the destination commits track, and which is snapshotted to the same blob, then the switch proceeds.)
 
 ** Related projects
-   After doing it in Java, I implemented it in Python as [Gitlepy](https://github.com/DavidRambo/gitlepy).
+   After doing it in Java, I implemented it in Python as [[Gitlepy][https://github.com/DavidRambo/gitlepy]].
 
 * TODOs
   - [X] cli arg parser
