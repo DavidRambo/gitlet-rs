@@ -7,8 +7,10 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use flate2::write::ZlibEncoder;
-use flate2::{Compression, write::ZlibDecoder};
+use flate2::{
+    Compression,
+    write::{ZlibDecoder, ZlibEncoder},
+};
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 
