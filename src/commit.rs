@@ -221,7 +221,6 @@ impl Iterator for CommitIter {
                 output_hash
             }
             (Some(parent), Some(merge)) =>
-            // todo!("If hashes differ, determine most recent commit. Set that to current_hash. Replace it with its parent.")
             {
                 let output_hash = self.current_hash.clone();
 
