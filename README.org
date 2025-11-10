@@ -1,5 +1,6 @@
 * gitlet-rs
   A simple git-like version control CLI written in Rust and inspired by UC Berkeley's Gitlet project (an assignment in a course that uses Java).
+  See the next section for an explanation of this implementation's several additional features beyond the original Gitlet spec.
   I'm writing this for my own edification, as it is a nice project for TDD of a CLI app.
 
 ** Differences from the original Gitlet spec
@@ -7,7 +8,7 @@
    - Gitlet initializes with a commit, which eliminates special cases for loading a hash from the HEAD file and providing a parent commit hash to the first commit. This implementation does not establish an initial, empty commit.
    - Gitlet does not support nested directory structures, whereas this implementation does.
    - This implementation also supports calling gitlet commands from anywhere within the working tree, not only at the root.
-   - Gitlet uses a single command, `remove`, to handle unstaging staged files and deleting them from the repo. This implementation adheres more closely to Git in that it provides a `rm` command with a `--cached` option.
+   - Gitlet uses a single command, `remove`, to handle unstaging staged files and deleting them from the repo. This implementation adheres more closely to Git in that it provides a `rm` command with a `--cached` option in addition to an explicit `unstage` command.
    - Gitlet lists all branches with its `status` command, including an asterisk next to the current branch. This implementation only shows the current branch with `status` and shows all branches with the `branch` command.
    - Gitlet uses `checkout`. This implementation uses `switch` and `switch -c`.
    - Gitlet requires a clear staging area before checking out a different branch. This implementation allows for non-conflicting modifications. (For example, if changes have been made to a file that both the source and the destination commits track, and which is snapshotted to the same blob, then the switch proceeds.)
@@ -16,6 +17,70 @@
    After doing it in Java, I implemented it in Python as [[Gitlepy][https://github.com/DavidRambo/gitlepy]].
 
 * Usage
+  To create a new gitlet repository:
+  #+begin_src:
+  gitlet init [path/to/directory]
+  #+end_src
+  The path to the root of the repository's working tree is optional.
+  By default, gitlet will initialize the repository in the current working directory.
+
+  To add a file to the staging area:
+  #+begin_src:
+  gitlet add path/to/file
+  #+end_src
+  Note that all commands that take a file path only take a single file at a time.
+
+  To unstage a file:
+  #+begin_src:
+  gitlet unstage path/to/file
+  #+end_src
+
+  To untrack a file and leave it in the working tree:
+  #+begin_src:
+  gitlet rm --cached path/to/file
+  #+end_src
+  To remove a file from the working tree, leave off the `--cached` option.
+
+  To display the status of the repository:
+  #+begin_src:
+  gitlet status
+  #+end_src
+
+  To commit changes:
+  #+begin_src:
+  gitlet commit "message"
+  #+end_src
+
+  To print a log of the commit history starting from the HEAD:
+  #+begin_src:
+  gitlet log
+  #+end_src
+
+  To list branches:
+  #+begin_src:
+  gitlet branch
+  #+end_src
+  The currently checked out branch is marked by an asterisk.
+
+  To delete a branch:
+  #+begin_src:
+  gitlet branch -D branch_name
+  #+end_src
+
+  To create a new branch, there are two options:
+  #+begin_src:
+  gitlet branch new_branch_name
+  #+end_src
+  creates the branch but remain in the currently checked out one;
+  #+begin_src:
+  gitlet switch -c new_branch_name
+  #+end_src
+  creates the new branch and switches to it.
+
+  To switch branches, use:
+  #+begin_src:
+  gitlet switch branch_name
+  #+end_src
   
 * TODOs
   - [X] cli arg parser
