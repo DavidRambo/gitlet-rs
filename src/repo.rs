@@ -77,18 +77,18 @@ pub fn status() -> Result<()> {
     Ok(())
 }
 
-/// Displays a list of branches, marking the one currently checked out with an asterisk.
+/// Dispatches for the `gitlet branch` command.
 pub fn branch(branch_name: Option<String>, delete: bool) -> Result<()> {
-    if delete {
-        if let Some(branch_name) = branch_name {
-            return delete_branch(&branch_name);
-        } else {
-            anyhow::bail!("Branch name required");
-        }
-    } else if let Some(branch_name) = branch_name {
-        return create_branch(&branch_name);
+    match (branch_name, delete) {
+        (None, false) => branches(),
+        (None, true) => anyhow::bail!("Branch name required"),
+        (Some(branch_name), true) => delete_branch(&branch_name),
+        (Some(branch_name), false) => create_branch(&branch_name),
     }
+}
 
+/// Displays a list of branches, marking the one currently checked out with an asterisk.
+fn branches() -> Result<()> {
     let repo_root = abs_path_to_repo_root().context("Get absolute path to repo directory")?;
     let head_branch: std::ffi::OsString = get_head_branch()
         .context("Get name of currently checked out branch")?
