@@ -56,6 +56,9 @@ enum Commands {
         #[arg(short, long)]
         create: bool,
     },
+
+    /// Merge currently checked out branch with the named branch.
+    Merge { branch_name: String },
 }
 
 fn main() -> Result<()> {
@@ -77,6 +80,7 @@ fn main() -> Result<()> {
             branch_name,
             create,
         } => repo::switch(&branch_name, create)?,
+        Commands::Merge { branch_name } => repo::merge(branch_name)?,
     }
 
     Ok(())
