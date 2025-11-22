@@ -455,6 +455,11 @@ pub fn commit(message: String) -> Result<()> {
     Ok(())
 }
 
+/// Merges the named branch into the current checked out branch.
+pub fn merge(branch_name: String) -> Result<()> {
+    todo!()
+}
+
 /// Helper function to update HEAD file
 fn update_head(hash: &str) -> Result<()> {
     let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root")?;
