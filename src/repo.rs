@@ -213,16 +213,11 @@ pub fn switch(branch_name: &str, create: bool) -> Result<()> {
 
 /// Checks out the head commit of the named branch.
 fn checkout_branch(branch_name: &str) -> Result<()> {
-    let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root")?;
-
-    let branch_ref = std::fs::read_to_string(repo_root.join(".gitlet/refs").join(branch_name))
-        .context("Read current HEAD commit")?;
-    if !branch_ref.is_empty() && branch_ref.len() != 40 {
-        anyhow::bail!("Invalid commit");
-    }
+    let branch_ref = read_branch_head(branch_name)?;
 
     checkout_commit(&branch_ref).with_context(|| format!("Checkout commit {branch_ref}"))?;
 
+    let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root")?;
     let mut head_file =
         std::fs::File::create(repo_root.join(".gitlet/HEAD")).context("Open HEAD file")?;
     head_file
@@ -572,8 +567,7 @@ fn read_head_hash() -> Result<String> {
     let branch_name = std::fs::read_to_string(repo_root.join(".gitlet/HEAD"))
         .context("Read branch name from HEAD")?;
 
-    let branch_ref = std::fs::read_to_string(repo_root.join(".gitlet/refs").join(branch_name))
-        .context("Read current HEAD commit")?;
+    let branch_ref = read_branch_head(&branch_name)?;
 
     if !branch_ref.is_empty() && branch_ref.len() != 40 {
         anyhow::bail!("Invalid commit");
@@ -585,6 +579,19 @@ fn read_head_hash() -> Result<String> {
 /// Returns the commit referenced by the HEAD file's hash.
 fn retrieve_head_commit() -> Result<Commit> {
     Commit::load(&read_head_hash()?)
+}
+
+/// Returns the head commit id for the given branch.
+fn read_branch_head(branch_name: &str) -> Result<String> {
+    let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root")?;
+
+    let branch_ref = std::fs::read_to_string(repo_root.join(".gitlet/refs").join(branch_name))
+        .context("Read current HEAD commit")?;
+    if !branch_ref.is_empty() && branch_ref.len() != 40 {
+        anyhow::bail!("Invalid commit");
+    }
+
+    Ok(branch_ref)
 }
 
 /// Prints out a log of the commit history starting from the HEAD.
