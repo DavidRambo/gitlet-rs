@@ -485,17 +485,26 @@ pub fn commit(message: String) -> Result<()> {
 ///
 /// 6. Conflicts? => Write conflicts into files, stage them for commit, and create a merge commit.
 pub fn merge(target_branch: String) -> Result<()> {
-    // Validate the merge
+    validate_merge(&target_branch)?;
+
+    Ok(())
+}
+
+/// Checks for problems with attempting to merge with the target branch.
+fn validate_merge(target_branch: &str) -> Result<()> {
+    // Staging area must be clear of changes.
     let index = index::Index::load().context("Load index to validate merge")?;
     if !index.is_clear() {
         anyhow::bail!("You have uncommited changes.");
     }
 
+    // Tracked files may not have modifications.
     let unstaged_files = unstaged_modifications()?;
     if !unstaged_files.is_empty() {
         anyhow::bail!("There is a file with unstaged changes.");
     }
 
+    // The target branch must exist.
     let repo_root = abs_path_to_repo_root().context("Get absolute path to repo directory")?;
     let branches: Vec<_> = repo_root
         .join(".gitlet/refs")
@@ -505,10 +514,11 @@ pub fn merge(target_branch: String) -> Result<()> {
         .filter(|e| e.file_type().is_ok_and(|f| f.is_file())) // Keep only files
         .map(|f| f.file_name().into_string().unwrap_or_default())
         .collect();
-    if !branches.contains(&target_branch) {
+    if !branches.iter().any(|b| b == target_branch) {
         anyhow::bail!("That branch does not exist.");
     }
 
+    // The target branch may not be the currently checked out branch.
     if target_branch == get_head_branch()? {
         anyhow::bail!("Cannot merge a branch with itself.");
     }
