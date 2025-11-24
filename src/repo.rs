@@ -459,20 +459,22 @@ pub fn commit(message: String) -> Result<()> {
 /// Merges the named branch into the currently checked out branch.
 ///
 /// The process:
-/// 1. Unstaged changes? => Abort.
-///
-/// 2. Staged, but uncommitted, changes? => Abort.
+/// 1. Validate merge
+///   a. Unstaged changes? => Abort.
+///   b. Staged, but uncommitted, changes? => Abort.
+///   c. Branch name does not exist? => Abort.
+///   d. Target branch same as checked out? => Abort.
 ///
 /// Get target branch's head commit.
 /// Get current HEAD.
 ///
-/// 3. Check for linear history.
+/// . Check for linear history.
 ///      c. If target commit is in current history, then abort.
 ///      d. If current HEAD is in target history, then fast forward to target.
 ///
-/// 4. Find most recent common commit -> split_commit.
+/// 3. Find most recent common commit -> split_commit.
 ///
-/// 5. Prepare merge while checking for conflicts.
+/// 4. Prepare merge while checking for conflicts.
 ///    a. Iterate over files tracked in split_commit, comparing with versions in HEAD and target.
 ///      1. Not modified in HEAD, modified in target => stage target blob for merge commit.
 ///      2. Not modified in HEAD, absent in target => stage for removal.
@@ -481,7 +483,7 @@ pub fn commit(message: String) -> Result<()> {
 ///         - Does this need to handle identically named files added after split_commit in current
 ///         HEAD?
 ///
-/// 7. Conflicts? => Write conflicts into files, stage them for commit, and create a merge commit.
+/// 6. Conflicts? => Write conflicts into files, stage them for commit, and create a merge commit.
 pub fn merge(target_branch: String) -> Result<()> {
     // Validate the merge
     let index = index::Index::load().context("Load index to validate merge")?;
@@ -489,8 +491,22 @@ pub fn merge(target_branch: String) -> Result<()> {
         anyhow::bail!("You have uncommited changes.");
     }
 
-    if let Ok(_unstaged_files) = unstaged_modifications() {
+    let unstaged_files = unstaged_modifications()?;
+    if !unstaged_files.is_empty() {
         anyhow::bail!("There is a file with unstaged changes.");
+    }
+
+    let repo_root = abs_path_to_repo_root().context("Get absolute path to repo directory")?;
+    let branches: Vec<_> = repo_root
+        .join(".gitlet/refs")
+        .read_dir()
+        .context("Read refs directory")?
+        .filter_map(Result::ok) // To skip Err entries
+        .filter(|e| e.file_type().is_ok_and(|f| f.is_file())) // Keep only files
+        .map(|f| f.file_name())
+        .collect();
+    if !branches.contains(&target_branch.into()) {
+        anyhow::bail!("That branch does not exist.");
     }
 
     Ok(())

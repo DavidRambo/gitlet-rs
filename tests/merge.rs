@@ -65,12 +65,8 @@ fn merge_unstaged_changes() -> Result<(), Box<dyn Error>> {
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("switch").arg("main").unwrap();
 
-    let mut cmd = Command::new("echo");
-    cmd.current_dir(&tmpdir)
-        .arg("Some text")
-        .arg(">>")
-        .arg("a.txt")
-        .unwrap();
+    let atxt_file = tmpdir.child("a.txt");
+    atxt_file.write_str("Some text")?;
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("merge").arg("dev");
@@ -120,7 +116,7 @@ fn merge_nonexistent_branch() -> Result<(), Box<dyn Error>> {
     cmd.current_dir(&tmpdir).arg("merge").arg("not_here");
     cmd.assert()
         .failure()
-        .stdout(predicate::str::contains("That branch does not exist."));
+        .stderr(predicate::str::contains("That branch does not exist."));
 
     Ok(())
 }
@@ -131,7 +127,7 @@ fn merge_self() -> Result<(), Box<dyn Error>> {
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("merge").arg("dev");
-    cmd.assert().failure().stdout(predicate::str::contains(
+    cmd.assert().failure().stderr(predicate::str::contains(
         "Cannot merge a branch with itself.",
     ));
 
