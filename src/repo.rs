@@ -503,10 +503,14 @@ pub fn merge(target_branch: String) -> Result<()> {
         .context("Read refs directory")?
         .filter_map(Result::ok) // To skip Err entries
         .filter(|e| e.file_type().is_ok_and(|f| f.is_file())) // Keep only files
-        .map(|f| f.file_name())
+        .map(|f| f.file_name().into_string().unwrap_or_default())
         .collect();
-    if !branches.contains(&target_branch.into()) {
+    if !branches.contains(&target_branch) {
         anyhow::bail!("That branch does not exist.");
+    }
+
+    if target_branch == get_head_branch()? {
+        anyhow::bail!("Cannot merge a branch with itself.");
     }
 
     Ok(())
