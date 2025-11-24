@@ -456,9 +456,40 @@ pub fn commit(message: String) -> Result<()> {
     Ok(())
 }
 
-/// Merges the named branch into the current checked out branch.
-pub fn merge(branch_name: String) -> Result<()> {
-    todo!()
+/// Merges the named branch into the currently checked out branch.
+///
+/// The process:
+/// 1. Unstaged changes? => Abort.
+///
+/// 2. Staged, but uncommitted, changes? => Abort.
+///
+/// Get target branch's head commit.
+/// Get current HEAD.
+///
+/// 3. Check for linear history.
+///      c. If target commit is in current history, then abort.
+///      d. If current HEAD is in target history, then fast forward to target.
+///
+/// 4. Find most recent common commit -> split_commit.
+///
+/// 5. Prepare merge while checking for conflicts.
+///    a. Iterate over files tracked in split_commit, comparing with versions in HEAD and target.
+///      1. Not modified in HEAD, modified in target => stage target blob for merge commit.
+///      2. Not modified in HEAD, absent in target => stage for removal.
+///      3. Modified in both => mark as in conflict.
+///    b. Iterate over files tracked in target, stage all files not in split_commit.
+///         - Does this need to handle identically named files added after split_commit in current
+///         HEAD?
+///
+/// 7. Conflicts? => Write conflicts into files, stage them for commit, and create a merge commit.
+pub fn merge(target_branch: String) -> Result<()> {
+    // TODO: Validate the merge:
+    let index = index::Index::load().context("Load index to validate merge")?;
+    if !index.is_clear() {
+        anyhow::bail!("You have uncommited changes.");
+    }
+
+    Ok(())
 }
 
 /// Helper function to update HEAD file

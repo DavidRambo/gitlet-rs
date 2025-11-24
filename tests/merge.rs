@@ -74,7 +74,7 @@ fn merge_unstaged_changes() -> Result<(), Box<dyn Error>> {
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("merge").arg("dev");
-    cmd.assert().failure().stdout(predicate::str::contains(
+    cmd.assert().failure().stderr(predicate::str::contains(
         "There is a file with unstaged changes.",
     ));
 
@@ -97,13 +97,17 @@ fn merge_uncommitted_changes() -> Result<(), Box<dyn Error>> {
         .unwrap();
 
     let mut cmd = Command::cargo_bin("gitlet")?;
-    cmd.current_dir(&tmpdir).arg("add").arg("a.txt");
+    cmd.current_dir(&tmpdir)
+        .arg("add")
+        .arg("a.txt")
+        .assert()
+        .success();
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("merge").arg("dev");
     cmd.assert()
         .failure()
-        .stdout(predicate::str::contains("You have uncommited changes."));
+        .stderr(predicate::str::contains("You have uncommited changes."));
 
     Ok(())
 }
