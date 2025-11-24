@@ -483,10 +483,14 @@ pub fn commit(message: String) -> Result<()> {
 ///
 /// 7. Conflicts? => Write conflicts into files, stage them for commit, and create a merge commit.
 pub fn merge(target_branch: String) -> Result<()> {
-    // TODO: Validate the merge:
+    // Validate the merge
     let index = index::Index::load().context("Load index to validate merge")?;
     if !index.is_clear() {
         anyhow::bail!("You have uncommited changes.");
+    }
+
+    if let Ok(_unstaged_files) = unstaged_modifications() {
+        anyhow::bail!("There is a file with unstaged changes.");
     }
 
     Ok(())
