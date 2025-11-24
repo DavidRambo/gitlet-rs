@@ -140,9 +140,9 @@ fn create_branch(branch_name: &str) -> Result<()> {
 
 /// Deletes the named branch.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if the named branch is currently checked out or does not exist.
+/// Returns an error if the named branch is currently checked out or does not exist.
 fn delete_branch(branch_name: &str) -> Result<()> {
     let current_branch = get_head_branch().context("Get current branch name")?;
     if branch_name == current_branch {
@@ -177,7 +177,7 @@ fn delete_branch(branch_name: &str) -> Result<()> {
 /// Switches to the named branch if it exists. If it does not exist and `create` is set, then it
 /// creates the branch and switches to it.
 ///
-/// # Panics
+/// # Errors
 ///
 /// Returns an error if the named branch does not exist and `create` is not set, or vice versa.
 pub fn switch(branch_name: &str, create: bool) -> Result<()> {
@@ -236,10 +236,10 @@ fn checkout_branch(branch_name: &str) -> Result<()> {
 
 /// Checks out the given commit.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics when there is a modified tracked file that differs (or does not exist) in the destination
-/// commit.
+/// Returns an error when there is a modified tracked file that differs (or does not exist) in
+/// the destination commit.
 fn checkout_commit(hash: &str) -> Result<()> {
     let src_commit_hash = &read_head_hash().context("Get hash of current HEAD commit")?;
 
@@ -380,7 +380,8 @@ fn file_differs_between_commits(
 /// For example, given a path `/var/tmp/work/sub/t.rs`, and assuming `/var/tmp/work/.gitlet`, the
 /// function would return "sub/t.rs".
 ///
-/// # Panics
+/// # Errors
+///
 /// It returns an error if there is no Gitlet repository or if the filepath does not exist.
 ///
 /// This is useful for nested directory structures as well as for stripping arbitrary parent paths,
