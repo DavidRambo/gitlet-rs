@@ -57,15 +57,6 @@ impl Index {
         Ok(())
     }
 
-    // NOTE: I ended up clearing the index with an associated function. I'm leaving this method
-    // here in case it comes in handy or I decide to refactor the commit process.
-    /* /// Clears the index file and drops the Index
-    pub(crate) fn clear(self) -> Result<()> {
-        let index_file = repo::abs_path_to_repo_root()?.join(".gitlet/index");
-        std::fs::remove_file(index_file).context("Delete .gitlet/index")?;
-        Ok(())
-    } */
-
     /// Stages a file for addition in the next commit.
     fn stage(&mut self, filepath: path::PathBuf, fpath_from_root: path::PathBuf) -> Result<()> {
         let blob = Blob::new(&filepath).with_context(|| "Creating blob for addition to index")?;
