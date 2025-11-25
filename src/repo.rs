@@ -480,6 +480,12 @@ pub fn commit(message: String) -> Result<()> {
 ///
 /// 6. Conflicts? => Write conflicts into files, stage them for commit, and create a merge commit.
 pub fn merge(target_branch: String) -> Result<()> {
+    // Save current working directory.
+    let initial_dir = std::env::current_dir().context("Get current working directory")?;
+    // Change to root of the repository.
+    std::env::set_current_dir(abs_path_to_repo_root().context("Get repository root directory")?)
+        .context("Set current working directory to the root of the repository")?;
+
     validate_merge(&target_branch)?;
 
     let head_hash = read_head_hash()?;
@@ -495,11 +501,28 @@ pub fn merge(target_branch: String) -> Result<()> {
 
     // Check for linear history: is one commit in the other's past?
     if validate_history(&head_hash, &branch_hash, &head_history, &target_history)? {
+        // Revert to initial working directory.
+        std::env::set_current_dir(&initial_dir)
+            .context("Reset working directory to where it was")?;
         return Ok(());
     }
 
     // Find the common ancestor, i.e. the split commit.
+    let Some(split_commit_hash) = find_split_commit(&head_history, &target_history) else {
+        anyhow::bail!("No common ancestor in commit histories");
+    };
+
     // Prepare merge while checking for conflicts.
+    let _conflicts = prepare_merge(&head_hash, &branch_hash, &split_commit_hash)?;
+
+    // If conflicts is not empty, then prepare conflicted files and commit the merge.
+    // Else commit the merge.
+
+    // Revert to initial working directory.
+    std::env::set_current_dir(&initial_dir).context("Reset working directory to where it was")?;
+
+    let current_branch = get_head_branch()?;
+    println!("Merged {target_branch} into {current_branch}");
 
     Ok(())
 }
@@ -564,6 +587,97 @@ fn validate_history(
     }
 
     Ok(false)
+}
+
+/// Returns the most recent common ancestor of the two commit histories as an Option.
+fn find_split_commit<'a>(
+    head_history: &'a [String],
+    target_history: &'a [String],
+) -> Option<&'a String> {
+    for hash in target_history {
+        if head_history.contains(hash) {
+            return Some(hash);
+        }
+    }
+
+    None
+}
+
+/// Prepares the staging area for a merge commit and returns a Vec of conflicted files.
+fn prepare_merge(
+    head_hash: &String,
+    target_commit_hash: &String,
+    split_commit_hash: &String,
+) -> Result<Vec<String>> {
+    let mut conflicts: Vec<String> = Vec::new();
+
+    let head_blobs = get_commit_blobs(&head_hash)?;
+    let mut target_blobs = get_commit_blobs(&target_commit_hash)?;
+    let split_blobs = get_commit_blobs(&split_commit_hash)?;
+
+    let mut index = Index::load()?;
+
+    // Iterate over blobs in the HEAD commit.
+    for (pathname, head_blob) in &head_blobs {
+        // If in target commit...
+        if let Some(target_blob) = target_blobs.get(pathname) {
+            // And in common ancestor commit, then...
+            if let Some(split_blob) = split_blobs.get(pathname) {
+                if target_blob.hash != split_blob.hash {
+                    // Modified in target commit.
+                    if head_blob.hash == split_blob.hash {
+                        // Unmodified in HEAD, update to target version.
+                        let fpath_from_root = find_working_tree_dir(pathname).with_context(
+                            || "Convert filepath to be relative to working tree root",
+                        )?;
+                        target_blob.restore(pathname)?;
+                        // TODO: The current stage implementation creates a new blob from the file
+                        // in the working tree. This is unnecessary, since the blob already exists.
+                        // Instead, this only needs to add the blob to index.additions.
+                        index.stage(pathname.clone(), fpath_from_root)?;
+                    } else {
+                        // Modified in HEAD as well, so add to conflicts.
+                        conflicts.push(
+                            pathname
+                                .to_str()
+                                .expect("Turn &PathBuf of pathname into a String")
+                                .into(),
+                        );
+                    }
+                }
+            } else if target_blob.hash != head_blob.hash {
+                // Not in split commit, so file was added to both branches separately and differs.
+                conflicts.push(
+                    pathname
+                        .to_str()
+                        .expect("Turn &PathBuf of pathname into a String")
+                        .into(),
+                );
+            }
+        // Not in target commit, so was it present at time of branch creation?
+        } else if let Some(split_blob) = split_blobs.get(pathname) {
+            if head_blob.hash == split_blob.hash {
+                // Unmodified in head, so remove; otherwise leave be.
+                let fpath_from_root = find_working_tree_dir(pathname)
+                    .with_context(|| "Convert filepath to be relative to working tree root")?;
+                index.rm(pathname, fpath_from_root)?;
+            }
+        }
+
+        // Remove entries from target_blobs that are in HEAD. This way, the final thing to do will
+        // be to merge remaining entries in target_blobs into HEAD for merge commit.
+        target_blobs.remove(pathname).unwrap();
+    }
+
+    // Merge remaining files in target branch into HEAD.
+    for (pathname, blob) in target_blobs {
+        blob.restore(&pathname)?;
+        let fpath_from_root = find_working_tree_dir(&pathname)
+            .with_context(|| "Convert filepath to be relative to working tree root")?;
+        index.stage(pathname, fpath_from_root)?;
+    }
+
+    Ok(conflicts)
 }
 
 /// Helper function to update HEAD file
