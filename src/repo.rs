@@ -546,19 +546,19 @@ fn validate_merge(target_branch: &str) -> Result<()> {
 /// Then checks whether the target branch contains the current HEAD, in which case the current
 /// branch is fast-forwarded.
 fn validate_history(
-    head_commit: &String,
-    target_commit: &String,
+    head_commit_hash: &String,
+    target_commit_hash: &String,
     head_history: &[String],
     target_history: &[String],
 ) -> Result<bool> {
-    if head_history.contains(&target_commit) {
+    if head_history.contains(&target_commit_hash) {
         println!("Target branch is an ancenstor of the current branch.");
         return Ok(true);
     }
 
-    if target_history.contains(&head_commit) {
+    if target_history.contains(&head_commit_hash) {
         println!("Current branch is fast-forwarded.");
-        update_head(target_commit)?;
+        checkout_commit(&target_commit_hash)?;
         return Ok(true);
     }
 
