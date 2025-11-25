@@ -236,7 +236,7 @@ fn merge_split_history() -> Result<(), Box<dyn Error>> {
     cmd.current_dir(&tmpdir).arg("merge").arg("dev");
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("Merged main into dev"));
+        .stdout(predicate::str::contains("Merged dev into main"));
 
     atxt_file.assert(predicate::str::contains("Main text"));
     btxt_file.assert(predicate::str::contains("Dev text in b"));
