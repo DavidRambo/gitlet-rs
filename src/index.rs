@@ -58,7 +58,17 @@ impl Index {
     }
 
     /// Stages a file for addition in the next commit.
-    fn stage(&mut self, filepath: path::PathBuf, fpath_from_root: path::PathBuf) -> Result<()> {
+    ///
+    /// # Parameters
+    /// `filepath` is the path to the file relative to the current working directory. This is used
+    /// to create a new blob of the file.
+    /// `fpath_from_root` is the path to the file relative to the root of the working tree. This is
+    /// used as the key in the Index's HashMaps.
+    pub(crate) fn stage(
+        &mut self,
+        filepath: path::PathBuf,
+        fpath_from_root: path::PathBuf,
+    ) -> Result<()> {
         let blob = Blob::new(&filepath).with_context(|| "Creating blob for addition to index")?;
         blob.save(&filepath)?;
 
@@ -71,6 +81,22 @@ impl Index {
     /// Returns true if the staging area is clear.
     pub(crate) fn is_clear(&self) -> bool {
         self.additions.is_empty() && self.removals.is_empty()
+    }
+
+    /// Stages file for removal.
+    ///
+    ///
+    pub(crate) fn rm(
+        &mut self,
+        file_name: &path::PathBuf,
+        path_from_root: path::PathBuf,
+    ) -> Result<()> {
+        std::fs::remove_file(file_name).context("Delete file from working tree")?;
+
+        self.removals.insert(path_from_root);
+        self.save()?;
+
+        Ok(())
     }
 }
 
