@@ -216,12 +216,13 @@ fn merge_file_conflict() -> Result<(), Box<dyn Error>> {
     atxt_file.write_str("Dev text")?;
 
     let mut cmd = Command::cargo_bin("gitlet")?;
-    cmd.current_dir(&tmpdir).arg("add").arg("a.txt");
+    cmd.current_dir(&tmpdir).arg("add").arg("a.txt").unwrap();
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir)
         .arg("commit")
-        .arg("Wrote 'Dev text' to a.txt");
+        .arg("Wrote 'Dev text' to a.txt")
+        .unwrap();
 
     // Save dev's commit id.
     let head_file = tmpdir.child(".gitlet/refs/dev");
@@ -236,12 +237,13 @@ fn merge_file_conflict() -> Result<(), Box<dyn Error>> {
     atxt_file.write_str("Main text")?;
 
     let mut cmd = Command::cargo_bin("gitlet")?;
-    cmd.current_dir(&tmpdir).arg("add").arg("a.txt");
+    cmd.current_dir(&tmpdir).arg("add").arg("a.txt").unwrap();
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir)
         .arg("commit")
-        .arg("Wrote 'Main text' to a.txt");
+        .arg("Wrote 'Main text' to a.txt")
+        .unwrap();
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("merge").arg("dev");
