@@ -138,14 +138,26 @@ fn merge_self() -> Result<(), Box<dyn Error>> {
 fn merge_new_file() -> Result<(), Box<dyn Error>> {
     let tmpdir = setup_merge_tests()?;
 
+    // Save dev's commit id.
+    let head_file = tmpdir.child(".gitlet/refs/dev");
+    let mut head_file = std::fs::File::open(head_file)?;
+    let mut dev_commit_id = String::with_capacity(41);
+    let _ = head_file.read_to_string(&mut dev_commit_id)?;
+
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("switch").arg("main").unwrap();
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("merge").arg("dev");
+    cmd.assert().success().stdout(predicate::str::contains(
+        "Current branch is fast-forwarded.",
+    ));
+
+    let mut cmd = Command::new("cat");
+    cmd.current_dir(&tmpdir).arg(".gitlet/refs/main");
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("Merged dev into main"));
+        .stdout(predicate::str::contains(&dev_commit_id));
 
     Ok(())
 }
@@ -172,7 +184,7 @@ fn merge_file_change() -> Result<(), Box<dyn Error>> {
     cmd.current_dir(&tmpdir).arg("merge").arg("dev");
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains("Merged dev into main"));
+        .stdout(predicate::str::contains("Current branch is fast-forwarded"));
 
     atxt_file.assert(predicate::str::contains("Some text"));
 
