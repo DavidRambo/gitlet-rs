@@ -217,11 +217,11 @@ fn merge_file_conflict() -> Result<(), Box<dyn Error>> {
         .arg("commit")
         .arg("Wrote 'Dev text' to a.txt");
 
-    // Save the commit id, which is now stored in HEAD, before switching to main.
-    let head_file = tmpdir.child(".gitlet/HEAD");
+    // Save dev's commit id.
+    let head_file = tmpdir.child(".gitlet/refs/dev");
     let mut head_file = std::fs::File::open(head_file)?;
-    let mut head_dev_commit_id = String::with_capacity(41);
-    let _ = head_file.read_to_string(&mut head_dev_commit_id)?;
+    let mut dev_commit_id = String::with_capacity(41);
+    let _ = head_file.read_to_string(&mut dev_commit_id)?;
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("switch").arg("main").unwrap();
@@ -243,7 +243,7 @@ fn merge_file_conflict() -> Result<(), Box<dyn Error>> {
         .success()
         .stdout(predicate::str::contains("Encountered a merge conflict."));
 
-    let expected = "<<<<<<< HEAD\nHead text\n=======\nDev text\n>>>>>>> {head_dev_commit_id}\n";
+    let expected = "<<<<<<< HEAD\nHead text\n=======\nDev text\n>>>>>>> {dev_commit_id}\n";
     atxt_file.assert(predicate::str::contains(expected));
 
     Ok(())
