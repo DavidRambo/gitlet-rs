@@ -197,6 +197,53 @@ fn merge_file_change() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Merges branches with separate files, common ancestor.
+#[test]
+fn merge_split_history() -> Result<(), Box<dyn Error>> {
+    let tmpdir = setup_merge_tests()?;
+
+    // Write changes into b.txt on branch dev.
+    let btxt_file = tmpdir.child("b.txt");
+    btxt_file.write_str("Dev text in b")?;
+
+    let mut cmd = Command::cargo_bin("gitlet")?;
+    cmd.current_dir(&tmpdir).arg("add").arg("b.txt").unwrap();
+
+    let mut cmd = Command::cargo_bin("gitlet")?;
+    cmd.current_dir(&tmpdir)
+        .arg("commit")
+        .arg("Wrote to b.txt")
+        .unwrap();
+
+    // Checkout main branch and write and commit changes to a.txt
+    let mut cmd = Command::cargo_bin("gitlet")?;
+    cmd.current_dir(&tmpdir).arg("switch").arg("main").unwrap();
+
+    let atxt_file = tmpdir.child("a.txt");
+    atxt_file.write_str("Main text")?;
+
+    let mut cmd = Command::cargo_bin("gitlet")?;
+    cmd.current_dir(&tmpdir).arg("add").arg("a.txt").unwrap();
+
+    let mut cmd = Command::cargo_bin("gitlet")?;
+    cmd.current_dir(&tmpdir)
+        .arg("commit")
+        .arg("Wrote 'Main text' to a.txt")
+        .unwrap();
+
+    // Merge with dev and check that a.txt and b.txt contain correct text.
+    let mut cmd = Command::cargo_bin("gitlet")?;
+    cmd.current_dir(&tmpdir).arg("merge").arg("dev");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Merged main into dev"));
+
+    atxt_file.assert(predicate::str::contains("Main text"));
+    btxt_file.assert(predicate::str::contains("Dev text in b"));
+
+    Ok(())
+}
+
 /// Merges a file with a conflict.
 ///
 /// First adds "Dev text" to a.txt in the dev branch.
