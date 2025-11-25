@@ -513,15 +513,20 @@ pub fn merge(target_branch: String) -> Result<()> {
     };
 
     // Prepare merge while checking for conflicts.
-    let _conflicts = prepare_merge(&head_hash, &branch_hash, &split_commit_hash)?;
+    let conflicts = prepare_merge(&head_hash, &branch_hash, &split_commit_hash)?;
 
-    // If conflicts is not empty, then prepare conflicted files and commit the merge.
-    // Else commit the merge.
+    let current_branch = get_head_branch()?;
+
+    // If conflicts is empty, then commit the merge.
+    if conflicts.is_empty() {
+        commit("Merged {target_branch} into {current_branch}".to_string())?;
+    } else {
+        // Else prepare conflicted files and commit the merge.
+    }
 
     // Revert to initial working directory.
     std::env::set_current_dir(&initial_dir).context("Reset working directory to where it was")?;
 
-    let current_branch = get_head_branch()?;
     println!("Merged {target_branch} into {current_branch}");
 
     Ok(())
