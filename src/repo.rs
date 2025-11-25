@@ -559,6 +559,7 @@ fn validate_history(
     if target_history.contains(&head_commit_hash) {
         println!("Current branch is fast-forwarded.");
         checkout_commit(&target_commit_hash)?;
+        update_head(target_commit_hash)?;
         return Ok(true);
     }
 
