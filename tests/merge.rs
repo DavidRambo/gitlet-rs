@@ -139,10 +139,10 @@ fn merge_new_file() -> Result<(), Box<dyn Error>> {
     let tmpdir = setup_merge_tests()?;
 
     // Save dev's commit id.
-    let head_file = tmpdir.child(".gitlet/refs/dev");
-    let mut head_file = std::fs::File::open(head_file)?;
+    let dev_ref = tmpdir.child(".gitlet/refs/dev");
+    let mut dev_ref = std::fs::File::open(dev_ref)?;
     let mut dev_commit_id = String::with_capacity(41);
-    let _ = head_file.read_to_string(&mut dev_commit_id)?;
+    let _ = dev_ref.read_to_string(&mut dev_commit_id)?;
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("switch").arg("main").unwrap();
