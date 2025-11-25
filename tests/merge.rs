@@ -170,12 +170,18 @@ fn merge_file_change() -> Result<(), Box<dyn Error>> {
     atxt_file.write_str("Some new text")?;
 
     let mut cmd = Command::cargo_bin("gitlet")?;
-    cmd.current_dir(&tmpdir).arg("add").arg("a.txt");
+    cmd.current_dir(&tmpdir)
+        .arg("add")
+        .arg("a.txt")
+        .assert()
+        .success();
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir)
         .arg("commit")
-        .arg("Added text to a.txt");
+        .arg("Added text to a.txt")
+        .assert()
+        .success();
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("switch").arg("main").unwrap();
@@ -186,7 +192,7 @@ fn merge_file_change() -> Result<(), Box<dyn Error>> {
         .success()
         .stdout(predicate::str::contains("Current branch is fast-forwarded"));
 
-    atxt_file.assert(predicate::str::contains("Some text"));
+    atxt_file.assert(predicate::str::contains("Some new text"));
 
     Ok(())
 }
