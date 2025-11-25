@@ -463,7 +463,7 @@ pub fn commit(message: String) -> Result<()> {
 /// Get target branch's head commit.
 /// Get current HEAD.
 ///
-/// . Check for linear history.
+/// 2. Check for linear history.
 ///      c. If target commit is in current history, then abort.
 ///      d. If current HEAD is in target history, then fast forward to target.
 ///
@@ -481,6 +481,25 @@ pub fn commit(message: String) -> Result<()> {
 /// 6. Conflicts? => Write conflicts into files, stage them for commit, and create a merge commit.
 pub fn merge(target_branch: String) -> Result<()> {
     validate_merge(&target_branch)?;
+
+    let head_hash = read_head_hash()?;
+    let branch_hash = read_branch_head(&target_branch)?;
+
+    // Load commits.
+    let head_commit = Commit::load(&head_hash).expect("Load HEAD commit");
+    let target_commit = Commit::load(&branch_hash).expect("Load target branch comit");
+
+    // Collect their histories.
+    let head_history: Vec<String> = head_commit.iter().map(|cmt| cmt.hash).collect();
+    let target_history: Vec<String> = target_commit.iter().map(|cmt| cmt.hash).collect();
+
+    // Check for linear history: is one commit in the other's past?
+    if validate_history(&head_hash, &branch_hash, &head_history, &target_history)? {
+        return Ok(());
+    }
+
+    // Find the common ancestor, i.e. the split commit.
+    // Prepare merge while checking for conflicts.
 
     Ok(())
 }
@@ -519,6 +538,31 @@ fn validate_merge(target_branch: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Returns true if the merge should be cancelled, fast-forwarding HEAD if appropriate.
+///
+/// First checks whether the target branch is an unmodified ancestor of the current branch.
+/// Then checks whether the target branch contains the current HEAD, in which case the current
+/// branch is fast-forwarded.
+fn validate_history(
+    head_commit: &String,
+    target_commit: &String,
+    head_history: &[String],
+    target_history: &[String],
+) -> Result<bool> {
+    if head_history.contains(&target_commit) {
+        println!("Target branch is an ancenstor of the current branch.");
+        return Ok(true);
+    }
+
+    if target_history.contains(&head_commit) {
+        println!("Current branch is fast-forwarded.");
+        update_head(target_commit)?;
+        return Ok(true);
+    }
+
+    Ok(false)
 }
 
 /// Helper function to update HEAD file
