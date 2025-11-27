@@ -455,6 +455,7 @@ pub fn commit(message: String) -> Result<()> {
 ///
 /// The process:
 /// 1. Validate merge
+///
 ///   a. Unstaged changes? => Abort.
 ///   b. Staged, but uncommitted, changes? => Abort.
 ///   c. Branch name does not exist? => Abort.
@@ -464,19 +465,21 @@ pub fn commit(message: String) -> Result<()> {
 /// Get current HEAD.
 ///
 /// 2. Check for linear history.
-///      c. If target commit is in current history, then abort.
-///      d. If current HEAD is in target history, then fast forward to target.
+///
+///   c. If target commit is in current history, then abort.
+///   d. If current HEAD is in target history, then fast forward to target.
 ///
 /// 3. Find most recent common commit -> split_commit.
 ///
 /// 4. Prepare merge while checking for conflicts.
-///    a. Iterate over files tracked in split_commit, comparing with versions in HEAD and target.
-///      1. Not modified in HEAD, modified in target => stage target blob for merge commit.
-///      2. Not modified in HEAD, absent in target => stage for removal.
-///      3. Modified in both => mark as in conflict.
-///    b. Iterate over files tracked in target, stage all files not in split_commit.
-///         - Does this need to handle identically named files added after split_commit in current
-///         HEAD?
+///
+///   a. Iterate over files tracked in split_commit, comparing with versions in HEAD and target.
+///     1. Not modified in HEAD, modified in target => stage target blob for merge commit.
+///     2. Not modified in HEAD, absent in target => stage for removal.
+///     3. Modified in both => mark as in conflict.
+///   b. Iterate over files tracked in target, stage all files not in split_commit.
+///        - Does this need to handle identically named files added after split_commit in current
+///        HEAD?
 ///
 /// 6. Conflicts? => Write conflicts into files, stage them for commit, and create a merge commit.
 pub fn merge(target_branch: String) -> Result<()> {
@@ -513,7 +516,7 @@ pub fn merge(target_branch: String) -> Result<()> {
     };
 
     // Prepare merge while checking for conflicts.
-    let conflicts = prepare_merge(&head_hash, &branch_hash, &split_commit_hash)?;
+    let conflicts = prepare_merge(&head_hash, &branch_hash, split_commit_hash)?;
 
     let current_branch = get_head_branch()?;
 
@@ -579,14 +582,14 @@ fn validate_history(
     head_history: &[String],
     target_history: &[String],
 ) -> Result<bool> {
-    if head_history.contains(&target_commit_hash) {
+    if head_history.contains(target_commit_hash) {
         println!("Target branch is an ancenstor of the current branch.");
         return Ok(true);
     }
 
-    if target_history.contains(&head_commit_hash) {
+    if target_history.contains(head_commit_hash) {
         println!("Current branch is fast-forwarded.");
-        checkout_commit(&target_commit_hash)?;
+        checkout_commit(target_commit_hash)?;
         update_head(target_commit_hash)?;
         return Ok(true);
     }
@@ -599,26 +602,23 @@ fn find_split_commit<'a>(
     head_history: &'a [String],
     target_history: &'a [String],
 ) -> Option<&'a String> {
-    for hash in target_history {
-        if head_history.contains(hash) {
-            return Some(hash);
-        }
-    }
-
-    None
+    target_history
+        .iter()
+        .find(|&hash| head_history.contains(hash))
+        .map(|hash| hash as _)
 }
 
 /// Prepares the staging area for a merge commit and returns a Vec of conflicted files.
 fn prepare_merge(
-    head_hash: &String,
-    target_commit_hash: &String,
-    split_commit_hash: &String,
+    head_hash: &str,
+    target_commit_hash: &str,
+    split_commit_hash: &str,
 ) -> Result<Vec<String>> {
     let mut conflicts: Vec<String> = Vec::new();
 
-    let head_blobs = get_commit_blobs(&head_hash)?;
-    let mut target_blobs = get_commit_blobs(&target_commit_hash)?;
-    let split_blobs = get_commit_blobs(&split_commit_hash)?;
+    let head_blobs = get_commit_blobs(head_hash)?;
+    let mut target_blobs = get_commit_blobs(target_commit_hash)?;
+    let split_blobs = get_commit_blobs(split_commit_hash)?;
 
     let mut index = Index::load()?;
 
@@ -660,13 +660,13 @@ fn prepare_merge(
                 );
             }
         // Not in target commit, so was it present at time of branch creation?
-        } else if let Some(split_blob) = split_blobs.get(pathname) {
-            if head_blob.hash == split_blob.hash {
-                // Unmodified in head, so remove; otherwise leave be.
-                let fpath_from_root = find_working_tree_dir(pathname)
-                    .with_context(|| "Convert filepath to be relative to working tree root")?;
-                index.rm(pathname, fpath_from_root)?;
-            }
+        } else if let Some(split_blob) = split_blobs.get(pathname)
+            && head_blob.hash == split_blob.hash
+        {
+            // Unmodified in head, so remove; otherwise leave be.
+            let fpath_from_root = find_working_tree_dir(pathname)
+                .with_context(|| "Convert filepath to be relative to working tree root")?;
+            index.rm(pathname, fpath_from_root)?;
         }
 
         // Remove entries from target_blobs that are in HEAD. This way, the final thing to do will
