@@ -114,9 +114,9 @@
   - [X] switch [-c]: create a new branch and switch to it
   - [X] Blob.restore() must create missing directories
   - [X] checkout_commit: remove empty intermediary directories unless command is issued from them
-  - [ ] merge (in progress on branch ~dev_merge~)
-     - [ ] merge: fast-forward
-     - [ ] merge: no conflicts
+  - [-] merge (in progress on branch ~dev_merge~)
+     - [X] merge: fast-forward
+     - [X] merge: no conflicts
      - [ ] merge: conflicts
   - [ ] support for detached HEAD (i.e. directly checkout a commit and not a branch)
   - [ ] add headers to gitlet objects (as in git)
