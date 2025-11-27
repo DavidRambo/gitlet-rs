@@ -303,12 +303,3 @@ fn merge_file_conflict() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-
-/// Ensures that an attempted merge between branches with disparate commit histories fails.
-/// For a repo to end up in this bad state, a branch would need to be manually created
-/// in the .gitlet directory or an existing branch's commit history would need to be
-/// manually tampered with.
-#[test]
-fn merge_no_split() -> Result<(), Box<dyn Error>> {
-    todo!()
-}
