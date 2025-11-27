@@ -60,18 +60,10 @@ impl Index {
     /// Stages a file for addition in the next commit.
     ///
     /// # Parameters
-    /// `filepath` is the path to the file relative to the current working directory. This is used
-    /// to create a new blob of the file.
     /// `fpath_from_root` is the path to the file relative to the root of the working tree. This is
     /// used as the key in the Index's HashMaps.
-    pub(crate) fn stage(
-        &mut self,
-        filepath: path::PathBuf,
-        fpath_from_root: path::PathBuf,
-    ) -> Result<()> {
-        let blob = Blob::new(&filepath).with_context(|| "Creating blob for addition to index")?;
-        blob.save(&filepath)?;
-
+    /// `blob` is the Blob object corresponding to the filethat is being staged.
+    pub(crate) fn stage(&mut self, fpath_from_root: path::PathBuf, blob: Blob) -> Result<()> {
         self.removals.remove(&fpath_from_root);
         self.additions.insert(fpath_from_root, blob);
 
@@ -138,14 +130,20 @@ pub fn status(mut writer: impl std::io::Write) -> Result<()> {
 pub fn action(action: IndexAction, filepath: &str) -> Result<()> {
     let mut index = Index::load()?;
 
-    let f = path::PathBuf::from(filepath);
-    anyhow::ensure!(f.exists(), "Cannot stage file. File does not exist.");
+    let filepath = path::PathBuf::from(filepath);
+    anyhow::ensure!(filepath.exists(), "Cannot stage file. File does not exist.");
 
-    let fpath_from_root = repo::find_working_tree_dir(&f)
+    let fpath_from_root = repo::find_working_tree_dir(&filepath)
         .with_context(|| "Convert filepath to be relative to working tree root")?;
 
     match action {
-        IndexAction::Add => index.stage(f, fpath_from_root).context("Stage file")?,
+        IndexAction::Add => {
+            let blob =
+                Blob::new(&filepath).with_context(|| "Creating blob for addition to index")?;
+            blob.save(&filepath)?;
+
+            index.stage(filepath, blob).context("Stage file")?;
+        }
         IndexAction::Unstage => {
             index.additions.remove(&fpath_from_root);
             index.removals.remove(&fpath_from_root);

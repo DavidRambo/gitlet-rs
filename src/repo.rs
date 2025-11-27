@@ -636,10 +636,7 @@ fn prepare_merge(
                             || "Convert filepath to be relative to working tree root",
                         )?;
                         target_blob.restore(pathname)?;
-                        // TODO: The current stage implementation creates a new blob from the file
-                        // in the working tree. This is unnecessary, since the blob already exists.
-                        // Instead, this only needs to add the blob to index.additions.
-                        index.stage(pathname.clone(), fpath_from_root)?;
+                        index.stage(fpath_from_root, target_blob.clone())?;
                     } else {
                         // Modified in HEAD as well, so add to conflicts.
                         conflicts.push(
@@ -679,7 +676,7 @@ fn prepare_merge(
         blob.restore(&pathname)?;
         let fpath_from_root = find_working_tree_dir(&pathname)
             .with_context(|| "Convert filepath to be relative to working tree root")?;
-        index.stage(pathname, fpath_from_root)?;
+        index.stage(fpath_from_root, blob)?;
     }
 
     Ok(conflicts)
