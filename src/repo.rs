@@ -613,8 +613,8 @@ fn prepare_merge(
     head_hash: &str,
     target_commit_hash: &str,
     split_commit_hash: &str,
-) -> Result<Vec<String>> {
-    let mut conflicts: Vec<String> = Vec::new();
+) -> Result<Vec<PathBuf>> {
+    let mut conflicts: Vec<PathBuf> = Vec::new();
 
     let head_blobs = get_commit_blobs(head_hash)?;
     let mut target_blobs = get_commit_blobs(target_commit_hash)?;
@@ -639,22 +639,12 @@ fn prepare_merge(
                         index.stage(fpath_from_root, target_blob.clone())?;
                     } else {
                         // Modified in HEAD as well, so add to conflicts.
-                        conflicts.push(
-                            pathname
-                                .to_str()
-                                .expect("Turn &PathBuf of pathname into a String")
-                                .into(),
-                        );
+                        conflicts.push(pathname.clone());
                     }
                 }
             } else if target_blob.hash != head_blob.hash {
                 // Not in split commit, so file was added to both branches separately and differs.
-                conflicts.push(
-                    pathname
-                        .to_str()
-                        .expect("Turn &PathBuf of pathname into a String")
-                        .into(),
-                );
+                conflicts.push(pathname.clone());
             }
         // Not in target commit, so was it present at time of branch creation?
         } else if let Some(split_blob) = split_blobs.get(pathname)
