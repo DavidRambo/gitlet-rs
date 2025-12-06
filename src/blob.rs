@@ -110,6 +110,24 @@ impl Blob {
         Ok(())
     }
 
+    /// Reads the blob object into a buffer.
+    pub fn read(&self, writer: &mut impl Write) -> Result<()> {
+        let blobpath = repo::abs_path_to_repo_root()?
+            .join(".gitlet/blobs")
+            .join(&self.hash[..2])
+            .join(&self.hash[2..]);
+
+        let mut blobfile =
+            fs::File::open(blobpath).context("Open blob object file for decompression")?;
+
+        let decoder = ZlibDecoder::new(writer);
+        let mut decoder = BufWriter::new(decoder);
+
+        std::io::copy(&mut blobfile, &mut decoder).context("Decompress blob object into buffer")?;
+
+        Ok(())
+    }
+
     /// Returns true (wrapped as a result) if its hash equals that of the other file's.
     ///
     /// Note: the filepath must be either relative to the current working directory or absolute.
