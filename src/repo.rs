@@ -699,6 +699,49 @@ fn prepare_merge(
     Ok(conflicts)
 }
 
+/// Writes a diff between two blob objects into their shared file, and stages them for the merge.
+///
+/// It takes `conflicts`, a reference to a Vec of Strings, which are the filepaths in conflict.
+/// `head_hash` and `target_commit_hash` are used to retrieve the blobs corresponding to the
+/// versions of the filepaaths in conflict.
+///
+/// Uses the Myer's diff algorithm rather than diff3. One way Gitlet simplifies its implementation
+/// compared to Git is, when faced with a merge conflict, by writing the entirety of the two files'
+/// contents one after the other. This implementation keeps the comparison of two files as opposed
+/// to diff3's comparison of three (the file present at the split commit is the third). But it
+/// writes a diff between the current branch's version of the file and the target branch's version.
+fn write_conflicts(
+    conflicts: &Vec<PathBuf>,
+    head_hash: &str,
+    target_commit_hash: &str,
+) -> Result<()> {
+    let head_blobs = get_commit_blobs(head_hash)?;
+    let target_blobs = get_commit_blobs(target_commit_hash)?;
+
+    for filepath in conflicts {
+        // Read each blob object into a String.
+        let mut current_vers = Vec::new();
+        head_blobs
+            .get(filepath)
+            .expect("Get blob for conflicted file's current version")
+            .read(&mut current_vers)?;
+        let current_vers = str::from_utf8(&current_vers);
+
+        let mut target_vers = Vec::new();
+        target_blobs
+            .get(filepath)
+            .expect("Get blob for conflicted file's target version")
+            .read(&mut target_vers)?;
+        let target_vers = str::from_utf8(&target_vers);
+
+        // Compute the diff.
+
+        // Write to the file.
+    }
+
+    todo!()
+}
+
 /// Helper function to update HEAD file
 fn update_head(hash: &str) -> Result<()> {
     let repo_root = abs_path_to_repo_root().context("Get absolute path to repo root")?;
