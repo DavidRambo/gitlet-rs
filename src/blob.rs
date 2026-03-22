@@ -116,7 +116,13 @@ impl Blob {
     pub fn hash_same_as_other_file(&self, fpath: &path::Path) -> Result<bool> {
         let other = Blob::new(fpath).context("Create blob of other filepath")?;
 
-        Ok(self.hash == other.hash)
+        Ok(*self == other)
+    }
+}
+
+impl PartialEq for Blob {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash
     }
 }
 

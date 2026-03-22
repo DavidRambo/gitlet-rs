@@ -347,7 +347,7 @@ fn checkout_commit(hash: &str) -> Result<()> {
         if !modified_tracked_files.contains(filepath) {
             // No need to restore file if it is the same.
             if let Some(src_blob) = src_tracked_files.get(filepath)
-                && src_blob.hash == blob.hash
+                && src_blob == blob
             {
                 continue;
             }
@@ -370,7 +370,7 @@ fn file_differs_between_commits(
         src_tracked_files.get(filepath),
         dst_tracked_files.get(filepath),
     ) {
-        (Some(src), Some(dst)) => Ok(src.hash != dst.hash),
+        (Some(src), Some(dst)) => Ok(src != dst),
         (_, _) => Ok(false),
     }
 }
