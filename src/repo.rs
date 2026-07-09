@@ -456,13 +456,14 @@ pub fn commit(message: String) -> Result<()> {
 /// The process:
 /// 1. Validate merge
 ///
+///   Checks:
 ///   a. Unstaged changes? => Abort.
 ///   b. Staged, but uncommitted, changes? => Abort.
 ///   c. Branch name does not exist? => Abort.
 ///   d. Target branch same as checked out? => Abort.
 ///
-/// Get target branch's head commit.
-/// Get current HEAD.
+///   Get target branch's head commit.
+///   Get current HEAD.
 ///
 /// 2. Check for linear history.
 ///
