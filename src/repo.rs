@@ -504,6 +504,7 @@ pub fn merge(target_branch: String) -> Result<()> {
     let target_history: Vec<String> = target_commit.iter().map(|cmt| cmt.hash).collect();
 
     // Check for linear history: is one commit in the other's past?
+    // If HEAD is in the target branch's past, then it fast-forwards HEAD to target.
     if validate_history(&head_hash, &branch_hash, &head_history, &target_history)? {
         // Revert to initial working directory.
         std::env::set_current_dir(&initial_dir)
@@ -526,6 +527,7 @@ pub fn merge(target_branch: String) -> Result<()> {
         commit("Merged {target_branch} into {current_branch}".to_string())?;
     } else {
         // Else prepare conflicted files and commit the merge.
+        // In Gitlet, this is done by concatenating the target version after the HEAD's version.
     }
 
     // Revert to initial working directory.
