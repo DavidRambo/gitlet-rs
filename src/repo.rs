@@ -2,8 +2,10 @@
 
 use std::collections::HashMap;
 use std::fs::{self, read_dir};
-use std::io::{self, Read, Write};
-use std::path::{self, Path, PathBuf};
+use std::{
+    io::{self, Read, Write},
+    path::{self, Path, PathBuf},
+};
 
 use anyhow::{Context, Result, anyhow};
 use walkdir::WalkDir;
@@ -17,7 +19,7 @@ use crate::{
 
 /// Holds data needed to create a diff of a merge-conflicted file.
 pub struct Conflict {
-    filepath: String,
+    filepath: PathBuf,
     head_blob: Blob,
     target_blob: Blob,
 }
@@ -540,7 +542,9 @@ pub fn merge(target_branch: String) -> Result<()> {
         commit("Merged {target_branch} into {current_branch}".to_string())?;
     } else {
         // Else prepare conflicted files and commit the merge.
-        // In Gitlet, this is done by concatenating the target version after the HEAD's version.
+        write_conflicts(&conflicts)?;
+        println!("Encountered a merge conflict.");
+        return Ok(());
     }
 
     // Revert to initial working directory.
@@ -656,10 +660,7 @@ fn prepare_merge(
                     } else {
                         // Modified in HEAD as well, so add to conflicts.
                         conflicts.push(Conflict {
-                            filepath: pathname
-                                .to_str()
-                                .expect("Turn &PathBuf of pathname into a String")
-                                .into(),
+                            filepath: pathname.to_path_buf(),
                             head_blob: head_blob.clone(),
                             target_blob: target_blob.clone(),
                         });
@@ -668,10 +669,7 @@ fn prepare_merge(
             } else if target_blob.hash != head_blob.hash {
                 // Not in split commit, so file was added to both branches separately and differs.
                 conflicts.push(Conflict {
-                    filepath: pathname
-                        .to_str()
-                        .expect("Turn &PathBuf of pathname into a String")
-                        .into(),
+                    filepath: pathname.to_path_buf(),
                     head_blob: head_blob.clone(),
                     target_blob: target_blob.clone(),
                 });
@@ -713,38 +711,79 @@ fn prepare_merge(
 /// contents one after the other. This implementation keeps the comparison of two files as opposed
 /// to diff3's comparison of three (the file present at the split commit is the third). But it
 /// writes a diff between the current branch's version of the file and the target branch's version.
-fn write_conflicts(
-    conflicts: &Vec<PathBuf>,
-    head_hash: &str,
-    target_commit_hash: &str,
-) -> Result<()> {
-    let head_blobs = get_commit_blobs(head_hash)?;
-    let target_blobs = get_commit_blobs(target_commit_hash)?;
-
-    for filepath in conflicts {
+fn write_conflicts(conflicts: &Vec<Conflict>) -> Result<()> {
+    for conflict in conflicts {
         // Read each blob object into a String.
         let mut current_vers = Vec::new();
-        head_blobs
-            .get(filepath)
-            .expect("Get blob for conflicted file's current version")
-            .read(&mut current_vers)?;
-        let current_vers = str::from_utf8(&current_vers);
+        conflict.head_blob.read(&mut current_vers)?;
+        let current_vers = str::from_utf8(&current_vers).unwrap().lines().collect();
+        eprintln!("{:?}", current_vers);
 
         let mut target_vers = Vec::new();
-        target_blobs
-            .get(filepath)
-            .expect("Get blob for conflicted file's target version")
-            .read(&mut target_vers)?;
-        let target_vers = str::from_utf8(&target_vers);
+        conflict.target_blob.read(&mut target_vers)?;
+        let target_vers = str::from_utf8(&target_vers).unwrap().lines().collect();
+        eprintln!("{:?}", target_vers);
 
         // Compute the diff.
-        // FIX: need to pass &Vec<String> for each file.
-        // let edit_sequence = diff::diff(current_vers, target_vers);
+        let edit_sequence = diff::diff(&current_vers, &target_vers).context("Computing diff")?;
 
         // Write to the file.
+        let mut buf: Vec<u8> = Vec::new();
+        let mut in_del = false;
+        let mut in_ins = false;
+
+        for edit in edit_sequence.iter() {
+            match edit {
+                diff::Diff::Delete(line) => {
+                    if in_del {
+                        buf.write(line.as_bytes())?;
+                        buf.write(b"\n")?;
+                    } else {
+                        if in_ins {
+                            buf.write(b"======\n")?;
+                            in_ins = false;
+                        }
+                        in_del = true;
+                        buf.write(b">>>>>> DELETION\n")?;
+                        buf.write(line.as_bytes())?;
+                        buf.write(b"\n")?;
+                    }
+                }
+                diff::Diff::Insert(line) => {
+                    if in_ins {
+                        buf.write(line.as_bytes())?;
+                        buf.write(b"\n")?;
+                    } else {
+                        if in_del {
+                            buf.write(b"======\n")?;
+                            in_del = false;
+                        }
+                        in_ins = true;
+                        buf.write(b">>>>>> INSERTION\n")?;
+                        buf.write(line.as_bytes())?;
+                        buf.write(b"\n")?;
+                    }
+                }
+                diff::Diff::Equal(line) => {
+                    if in_del || in_ins {
+                        buf.write(b"======\n")?;
+                        in_del = false;
+                        in_ins = false;
+                    }
+                    buf.write(line.as_bytes())?;
+                    buf.write(b"\n")?;
+                }
+            }
+        }
+        if in_del || in_ins {
+            buf.write(b"======\n")?;
+        }
+        let mut f =
+            fs::File::create(&conflict.filepath).context("Truncating file in merge conflict")?;
+        f.write(&buf)?;
     }
 
-    todo!()
+    Ok(())
 }
 
 /// Helper function to update HEAD file
@@ -1127,5 +1166,10 @@ mod tests {
 
             Ok(())
         })
+    }
+
+    #[test]
+    fn write_conflicted_files() -> Result<()> {
+        Ok(())
     }
 }

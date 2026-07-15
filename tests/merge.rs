@@ -249,18 +249,12 @@ fn merge_split_history() -> Result<(), Box<dyn Error>> {
 /// First adds "Dev text" to a.txt in the dev branch.
 /// Then checks out main and modifies a.txt to contain 'Main text'.
 /// Adds and commits the change, then merges with dev branch.
-/// a.txt should contain:
-///     <<<<<<< HEAD
-///     Main text
-///     =======
-///     Dev text
-///     >>>>>>> {head_dev_commit_id}
 #[test]
 fn merge_file_conflict() -> Result<(), Box<dyn Error>> {
     let tmpdir = setup_merge_tests()?;
 
     let atxt_file = tmpdir.child("a.txt");
-    atxt_file.write_str("Dev text")?;
+    atxt_file.write_str("C\nB\nA\nB\nA\nC\n")?;
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("add").arg("a.txt").unwrap();
@@ -281,7 +275,7 @@ fn merge_file_conflict() -> Result<(), Box<dyn Error>> {
     cmd.current_dir(&tmpdir).arg("switch").arg("main").unwrap();
 
     let atxt_file = tmpdir.child("a.txt");
-    atxt_file.write_str("Main text")?;
+    atxt_file.write_str("A\nB\nC\nA\nB\nB\nA\n")?;
 
     let mut cmd = Command::cargo_bin("gitlet")?;
     cmd.current_dir(&tmpdir).arg("add").arg("a.txt").unwrap();
@@ -298,7 +292,25 @@ fn merge_file_conflict() -> Result<(), Box<dyn Error>> {
         .success()
         .stdout(predicate::str::contains("Encountered a merge conflict."));
 
-    let expected = "<<<<<<< HEAD\nHead text\n=======\nDev text\n>>>>>>> {dev_commit_id}\n";
+    let expected = "\
+>>>>>> DELETION\n\
+A\n\
+B\n\
+======\n\
+C\n\
+>>>>>> INSERTION\n\
+B\n\
+======\n\
+A\n\
+B\n\
+>>>>>> DELETION\n\
+B\n\
+======\n\
+A\n\
+>>>>>> INSERTION\n\
+C\n\
+======\
+";
     atxt_file.assert(predicate::str::contains(expected));
 
     Ok(())

@@ -6,6 +6,8 @@ use std::{
     ops::{Index, IndexMut},
 };
 
+use anyhow::Result;
+
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum Diff<'a> {
     Delete(&'a str),
@@ -124,12 +126,25 @@ impl Display for MyersVector {
 }
 
 /// Entry point for creating the diff.
-pub fn diff<'a>(current: &'a Vec<&str>, target: &'a Vec<&str>) -> Result<Vec<Diff<'a>>, ()> {
+pub fn diff<'a>(current: &'a Vec<&str>, target: &'a Vec<&str>) -> Result<Vec<Diff<'a>>> {
     let mut diff = vec![];
 
     // TODO: handle equal leading and ending lines.
 
-    let steps = walk_snakes(current, target).expect("Failed to generate diff.");
+    let Some(steps) = walk_snakes(current, target) else {
+        // Failed to compute the diff, so fall back on original Gitlet approach: current file
+        // contents followed by the target's contents. I'm treating the current as deleted and the
+        // target as inserted.
+        for line in current.iter() {
+            diff.push(Diff::Delete(&line));
+        }
+
+        for line in target.iter() {
+            diff.push(Diff::Insert(&line));
+        }
+
+        return Ok(diff);
+    };
 
     for ((x1, y1), (x2, y2)) in steps.iter() {
         if x1 == x2 {
@@ -205,41 +220,11 @@ fn find_path<'a>(
         return None;
     };
 
-    if start.0 == 1 && start.1 == 0 && end.0 == 3 && end.1 == 1 {
-        // This is the third snake, which happens to be returned by forwards and is
-        // triggering an incorrect calculation of max_d as 3 instead of 2. The next
-        // recursive call to find_path creates the MyersBox that is (1,0) by (1, 0).
-        eprintln!(">>> Third snake found! About to recursively call find_path with:");
-        dbg!(left);
-        dbg!(top);
-        dbg!(start.0);
-        dbg!(start.1);
-        let mbs = (start.0 - left) + (start.1 - top);
-        eprintln!("MyersBox size will be: {}", mbs);
-        let md = mbs.div_ceil(2);
-        eprintln!("Max d will be: {}", md);
-    }
-
     let mut head = if let Some(head) = find_path(current, target, left, top, start.0, start.1) {
         head
     } else {
         vec![(start.0, start.1)]
     };
-
-    if start.0 == 1 && start.1 == 0 && end.0 == 3 && end.1 == 1 {
-        // This is the third snake, which happens to be returned by forwards and is
-        // triggering an incorrect calculation of max_d as 3 instead of 2. The next
-        // recursive call to find_path creates the MyersBox that is (1,0) by (1, 0).
-        eprintln!(">>> About to recursively call find_path with:");
-        dbg!(end.0);
-        dbg!(end.1);
-        dbg!(right);
-        dbg!(bottom);
-        let mbs = (right - end.0) + (bottom - end.1);
-        eprintln!("MyersBox size will be: {}", mbs);
-        let md = mbs.div_ceil(2);
-        eprintln!("Max d will be: {}", md);
-    }
 
     let tail = if let Some(tail) = find_path(current, target, end.0, end.1, right, bottom) {
         tail
@@ -259,11 +244,8 @@ fn midpoint<'a>(
     if m_box.size() <= 0 {
         return None;
     }
-    eprintln!("> > > Midpoint < < <");
 
     let max_d = (m_box.size() as usize).div_ceil(2);
-    dbg!(m_box.size());
-    dbg!(&max_d);
 
     let mut vf = MyersVector::new(max_d);
     vf[1] = m_box.left as isize;
@@ -271,30 +253,19 @@ fn midpoint<'a>(
     vb[1] = m_box.bottom as isize;
 
     for d in 0..max_d + 1 {
-        dbg!(&d);
         if let Some(snake) = forwards(current, target, m_box, &mut vf, &mut vb, d) {
-            eprintln!("Forwards snake:");
-            dbg!(&snake);
             return Some((
                 (snake.start.0 as usize, snake.start.1 as usize),
                 (snake.end.0 as usize, snake.end.1 as usize),
             ));
         }
-        eprintln!("After forwards:");
-        eprintln!("{}", &vf);
-        eprintln!("{}", &vb);
 
         if let Some(snake) = backwards(current, target, m_box, &mut vf, &mut vb, d) {
-            eprintln!("Backwards snake:");
-            dbg!(&snake);
             return Some((
                 (snake.start.0 as usize, snake.start.1 as usize),
                 (snake.end.0 as usize, snake.end.1 as usize),
             ));
         }
-        eprintln!("After backwards:");
-        eprintln!("{}", &vf);
-        eprintln!("{}", &vb);
     }
 
     None
@@ -338,7 +309,6 @@ fn forwards<'a>(
         vf[k] = x;
 
         if odd_ses_len && (c >= (-(d - 1)) && c <= (d - 1)) && y >= vb[c] {
-            eprintln!("Forwards returning snake... d={}, k={}", d, k);
             return Some(Snake {
                 start: (prev_x, prev_y),
                 end: (x, y),
@@ -401,11 +371,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_myer_example() {
+    fn test_myer_example() -> Result<()> {
         let a = vec!["A", "B", "C", "A", "B", "B", "A"];
         let b = vec!["C", "B", "A", "B", "A", "C"];
-        let actual_ses = diff(&a, &b);
-        let expected_ses = Ok(vec![
+        let actual_ses = diff(&a, &b)?;
+        let expected_ses = vec![
             Diff::Delete("A"),
             Diff::Delete("B"),
             Diff::Equal("C"),
@@ -415,8 +385,21 @@ mod tests {
             Diff::Delete("B"),
             Diff::Equal("A"),
             Diff::Insert("C"),
-        ]);
+        ];
 
         assert_eq!(actual_ses, expected_ses);
+        Ok(())
+    }
+
+    #[test]
+    fn test_one_line_change() -> Result<()> {
+        let a = vec!["Main text"];
+        let b = vec!["Dev text"];
+        let actual_ses = diff(&a, &b)?;
+        let expected_ses = vec![Diff::Delete("Main text"), Diff::Insert("Dev text")];
+
+        // FIX: Note that this test only passes thanks to the fallback in diff().
+        assert_eq!(actual_ses, expected_ses);
+        Ok(())
     }
 }
