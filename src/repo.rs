@@ -12,6 +12,13 @@ use crate::blob::Blob;
 use crate::commit::{Commit, get_commit_blobs};
 use crate::index::{self, Index};
 
+/// Holds data needed to create a diff of a merge-conflicted file.
+pub struct Conflict {
+    filepath: String,
+    head_blob: Blob,
+    target_blob: Blob,
+}
+
 /// Initializes a new gitlet repository. `repo_path` is an optional argument passed to
 /// `gitlet init` to specify the directory for the new repository. It defaults to the PWD.
 pub fn init(repo_dir: Option<String>) -> Result<()> {
@@ -619,8 +626,8 @@ fn prepare_merge(
     head_hash: &str,
     target_commit_hash: &str,
     split_commit_hash: &str,
-) -> Result<Vec<String>> {
-    let mut conflicts: Vec<String> = Vec::new();
+) -> Result<Vec<Conflict>> {
+    let mut conflicts: Vec<Conflict> = Vec::new();
 
     let head_blobs = get_commit_blobs(head_hash)?;
     let mut target_blobs = get_commit_blobs(target_commit_hash)?;
@@ -645,22 +652,26 @@ fn prepare_merge(
                         index.stage(fpath_from_root, target_blob.clone())?;
                     } else {
                         // Modified in HEAD as well, so add to conflicts.
-                        conflicts.push(
-                            pathname
+                        conflicts.push(Conflict {
+                            filepath: pathname
                                 .to_str()
                                 .expect("Turn &PathBuf of pathname into a String")
                                 .into(),
-                        );
+                            head_blob: head_blob.clone(),
+                            target_blob: target_blob.clone(),
+                        });
                     }
                 }
             } else if target_blob.hash != head_blob.hash {
                 // Not in split commit, so file was added to both branches separately and differs.
-                conflicts.push(
-                    pathname
+                conflicts.push(Conflict {
+                    filepath: pathname
                         .to_str()
                         .expect("Turn &PathBuf of pathname into a String")
                         .into(),
-                );
+                    head_blob: head_blob.clone(),
+                    target_blob: target_blob.clone(),
+                });
             }
         // Not in target commit, so was it present at time of branch creation?
         } else if let Some(split_blob) = split_blobs.get(pathname)
