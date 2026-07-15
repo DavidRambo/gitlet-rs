@@ -10,7 +10,10 @@ use walkdir::WalkDir;
 
 use crate::blob::Blob;
 use crate::commit::{Commit, get_commit_blobs};
-use crate::index::{self, Index};
+use crate::{
+    diff,
+    index::{self, Index},
+};
 
 /// Holds data needed to create a diff of a merge-conflicted file.
 pub struct Conflict {
@@ -735,6 +738,8 @@ fn write_conflicts(
         let target_vers = str::from_utf8(&target_vers);
 
         // Compute the diff.
+        // FIX: need to pass &Vec<String> for each file.
+        // let edit_sequence = diff::diff(current_vers, target_vers);
 
         // Write to the file.
     }
