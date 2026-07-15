@@ -514,6 +514,9 @@ pub fn merge(target_branch: String) -> Result<()> {
 
     // Find the common ancestor, i.e. the split commit.
     let Some(split_commit_hash) = find_split_commit(&head_history, &target_history) else {
+        // First revert to the initial working directory.
+        std::env::set_current_dir(&initial_dir)
+            .context("Reset working directory to where it was")?;
         anyhow::bail!("No common ancestor in commit histories");
     };
 
