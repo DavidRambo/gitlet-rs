@@ -10,6 +10,7 @@ use walkdir::WalkDir;
 
 use crate::blob::Blob;
 use crate::commit::{Commit, get_commit_blobs};
+use crate::diff;
 use crate::index::{self, Index};
 
 /// Initializes a new gitlet repository. `repo_path` is an optional argument passed to
@@ -674,7 +675,7 @@ fn prepare_merge(
 
 /// Writes a diff between two blob objects into their shared file, and stages them for the merge.
 ///
-/// It takes `conflicts`, a reference to a Vec of Strings, which are the filepaths in conflict.
+/// It takes `conflicts`, a reference to a Vec of PathBufs, which are the filepaths in conflict.
 /// `head_hash` and `target_commit_hash` are used to retrieve the blobs corresponding to the
 /// versions of the filepaaths in conflict.
 ///
@@ -698,16 +699,18 @@ fn write_conflicts(
             .get(filepath)
             .expect("Get blob for conflicted file's current version")
             .read(&mut current_vers)?;
-        let current_vers = str::from_utf8(&current_vers);
+        let current_vers = str::from_utf8(&current_vers)?;
 
         let mut target_vers = Vec::new();
         target_blobs
             .get(filepath)
             .expect("Get blob for conflicted file's target version")
             .read(&mut target_vers)?;
-        let target_vers = str::from_utf8(&target_vers);
+        let target_vers = str::from_utf8(&target_vers)?;
 
         // Compute the diff.
+        // FIX: need to pass Vec<String> for each file.
+        // let edit_sequence = diff::diff(current_vers, target_vers);
 
         // Write to the file.
     }
